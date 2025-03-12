@@ -8,6 +8,7 @@ import AccordionDetails from '@material-ui/core/AccordionDetails';
 import AccordionSummary from '@material-ui/core/AccordionSummary';
 import Typography from '@material-ui/core/Typography';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
+import emitter from '@utils/events.utils';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -36,7 +37,7 @@ export default function ControlledAccordions({ onSubmit }) {
   const classes = useStyles();
   const [expanded, setExpanded] = useState(false);
   const [formData, setFormData] = useState({
-    startDate: "2024-04-14",
+    startDate: "2000-04-14",
     endDate: "2024-05-14",
     indexType: 'NDVI',
     aoiDataFiles: []
@@ -119,7 +120,7 @@ export default function ControlledAccordions({ onSubmit }) {
       data.append('startDate', formData.startDate)
       data.append('endDate', formData.endDate)
 
-      const response = await fetch('http://localhost:5004/spatiotemporal_analysis', {
+      const response = await fetch('https://terrenviron.evenor-tech.com/api/spatiotemporal_analysis', {
         method: 'POST',
         body: data
       });
@@ -130,10 +131,14 @@ export default function ControlledAccordions({ onSubmit }) {
         console.log('Data sent successfully', result);
         onSubmit(result);
         setLoading(false);
+        emitter.emit('closeAllController');
+        emitter.emit('openLayerController');
         return true;
       }
 
     } catch (error) {
+      setLoading(false);
+      emitter.emit('showSnackbar', 'error', `Error: '${error}'`);
       console.error('Failed to send data', error);
     }
   };
@@ -152,7 +157,7 @@ export default function ControlledAccordions({ onSubmit }) {
         <DropzoneArea
             onChange={(files) => handleFileChange('aoiDataFiles', files)}
             acceptedFiles={['.zip']}
-            dropzoneText="Area of Interest (AOI)"
+            dropzoneText="Area of Interest"
             maxFileSize={5000000}
             filesLimit={1}
             getPreviewIcon={handlePreviewIcon}
@@ -206,7 +211,7 @@ export default function ControlledAccordions({ onSubmit }) {
       <Backdrop className={classes.backdrop} open={loading}>
         <CircularProgress color="inherit" />
         <Typography variant="h6" className={classes.progressText}>
-          Ejecutando el modelo... {timer}s
+          Loading... {timer}s
         </Typography>
       </Backdrop>
     </div>

@@ -4,7 +4,11 @@ const mapStyles = {
     Streets: 'mapbox://styles/mapbox/streets-v11',
     Light: 'mapbox://styles/mapbox/light-v10',
     Dark: 'mapbox://styles/mapbox/dark-v10',
-    Navigation: 'mapbox://styles/mapbox/navigation-night-v1'
+    Navigation_Day: 'mapbox://styles/mapbox/navigation-day-v1',
+    Navigation_Night: 'mapbox://styles/mapbox/navigation-night-v1',
+    Satellite: 'mapbox://styles/mapbox/satellite-v9',
+    Satellite_Streets: 'mapbox://styles/mapbox/satellite-streets-v11',
+    Outdoors: 'mapbox://styles/mapbox/outdoors-v11'
 };
 
 

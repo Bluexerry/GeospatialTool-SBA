@@ -9,22 +9,67 @@ import requests
 import os
 import tempfile
 import json
+import math
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, origins=["http://localhost:3000"])   
+CORS(app, supports_credentials=True, origins=["https://terrenviron.evenor-tech.com"])
 
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER) 
+
+# Ruta al archivo CSV donde se almacenarán los usuarios
+CSV_FILE_PATH = 'server/earth_engine_service/files/users.csv'
+
+# Verifica si el archivo CSV existe, si no, crea uno con los encabezados
+if not os.path.exists(CSV_FILE_PATH):
+    df = pd.DataFrame(columns=['Email', 'Name', 'Organisation', 'Type_of_Organisation', 'Country'])
+    df.to_csv(CSV_FILE_PATH, index=False)
+
     
-ee.Authenticate(auth_mode="appdefault", quiet=False)
+ee.Authenticate(auth_mode="gcloud")
 ee.Initialize(project='soil-values-predictor')
 
-@app.route('/', methods=['GET'])
+@app.route('/api/', methods=['GET'])
 def index():
     return ""
 
-@app.route('/watsat', methods=['GET'])
+@app.route('/api/register_user', methods=['POST'])
+def register_user():
+    try:
+        # Extraer datos del cuerpo de la solicitud (enviados por el frontend)
+        data = request.json
+        email = data.get('email')
+        name = data.get('name')
+        organisation = data.get('organisation')
+        type_of_organisation = data.get('type_of_organisation')
+        country = data.get('country')
+
+        # Asegurarse de que todos los campos están presentes
+        if not all([email, name, organisation, type_of_organisation, country]):
+            return jsonify({"error": "All fields are required"}), 400
+
+        # Crear un nuevo registro de usuario
+        new_user = pd.DataFrame([{
+            'Email': email,
+            'Name': name,
+            'Organisation': organisation,
+            'Type_of_Organisation': type_of_organisation,
+            'Country': country
+        }])
+
+        # Leer el CSV existente y agregar el nuevo registro
+        df = pd.read_csv(CSV_FILE_PATH)
+        df = pd.concat([df, new_user], ignore_index=True)
+
+        # Guardar de nuevo el archivo CSV
+        df.to_csv(CSV_FILE_PATH, index=False)
+
+        return jsonify({"success": True, "message": "User registered successfully"}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+@app.route('/api/watsat', methods=['GET'])
 def get_watsat():
     try:
             # Define el área de interés usando coordenadas
@@ -92,115 +137,144 @@ def get_watsat():
         return jsonify({"error": str(e)}), 500
     
 
-@app.route('/vegetation_index_change_inspector', methods=['POST'])
+@app.route('/api/vegetation_index_change_inspector', methods=['POST'])
 def vegetation_index_change_inspector():
     try:
-        
-        aoi_file = request.files['aoiDataFiles']
-        
-        band = request.form['indexType']
+        # Validación de inputs
+        if 'aoiDataFiles' not in request.files or 'indexType' not in request.form:
+            return jsonify({"error": "Faltan datos requeridos (aoiDataFiles, indexType)"}), 400
 
-        
+        aoi_file = request.files['aoiDataFiles']
+        band = request.form['indexType']
+        start_date = request.form.get('startDate')
+        end_date = request.form.get('endDate')
+
+        # Validación de fechas
+        if not start_date or not end_date:
+            return jsonify({"error": "Faltan fechas (startDate, endDate)"}), 400
+
+        try:
+            start_year = int(start_date[:4])
+            end_year = int(end_date[:4])
+            if start_year > end_year or (start_year == end_year and start_date[5:] > end_date[5:]):
+                return jsonify({"error": "El rango de fechas es inválido: la fecha de inicio debe ser anterior a la fecha de fin."}), 400
+        except ValueError:
+            return jsonify({"error": "Formato de fecha inválido. Use el formato YYYY-MM-DD."}), 400
+
+        # Procesamiento del archivo AOI
         with tempfile.TemporaryDirectory() as temp_dir:
             aoi_filepath = os.path.join(temp_dir, secure_filename(aoi_file.filename))
-
-        # Directorio base donde se encuentra el script
-
-        # Ruta al archivo shapefile
             aoi_file.save(aoi_filepath)
-
             gdf = gpd.read_file(aoi_filepath)
             geojson_dict = gdf.__geo_interface__
-            table = ee.FeatureCollection(geojson_dict['features'])   
-                
+            aoi = ee.FeatureCollection(geojson_dict['features'])
+
+        # Definir las funciones de procesamiento
+        def harmonizationRoy(oli):
+            slopes = ee.Image.constant([0.9785, 0.9542, 0.9825, 1.0073, 1.0171, 0.9949])
+            itcp = ee.Image.constant([-0.0095, -0.0016, -0.0022, -0.0021, -0.0030, 0.0029])
+            return oli.select(['SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B6', 'SR_B7'], 
+                              ['SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B7']) \
+                      .subtract(itcp.multiply(10000)).divide(slopes).set('system:time_start', oli.get('system:time_start'))
+
+        def getSRcollection(year, startDay, endDay, sensor, aoi):
+            srCollection = ee.ImageCollection('LANDSAT/' + sensor + '/C02/T1_L2') \
+                .filterBounds(aoi) \
+                .filterDate(f'{year}-{startDay}', f'{year}-{endDay}')
+            
+            # Harmonización de Landsat 8 y selección de bandas para Landsat 5 y 7
+            srCollection = srCollection.map(lambda img: harmonizationRoy(img) if sensor == 'LC08' else img \
+                                            .select(['SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B7']) \
+                                            .resample('bicubic').set('system:time_start', img.get('system:time_start')))
+            
+            # Convertir bandas a tipo Integer
+            srCollection = srCollection.map(lambda img: img.toInt16())
+            
+            return srCollection
+
+        def getCombinedSRcollection(startYear, endYear, startDay, endDay, aoi):
+            lt5 = getSRcollection(startYear, startDay, endDay, 'LT05', aoi)
+            le7 = getSRcollection(startYear, startDay, endDay, 'LE07', aoi)
+            lc8 = getSRcollection(startYear, startDay, endDay, 'LC08', aoi)
+            return ee.ImageCollection(lt5.merge(le7).merge(lc8))
+
+        def add_indices(image):
+            ndvi = image.expression('float((NIR - RED) / (NIR + RED))', {
+                'NIR': image.select('SR_B4'),
+                'RED': image.select('SR_B3')
+            }).rename('NDVI')
+
+            evi = image.expression('2.5 * ((NIR - RED) / (NIR + 6 * RED - 7.5 * BLUE + 1))', {
+                'NIR': image.select('SR_B4'),
+                'RED': image.select('SR_B3'),
+                'BLUE': image.select('SR_B1')
+            }).rename('EVI')
+
+            savi = image.expression('float(((NIR - RED) / (NIR + RED + 0.5)) * (1 + 0.5))', {
+                'NIR': image.select('SR_B4'),
+                'RED': image.select('SR_B3')
+            }).rename('SAVI')
+
+            return image.addBands([ndvi, evi, savi])
+
+        # Definir el rango de fechas y días del año
+        startDay, endDay = start_date[5:], end_date[5:]
         
-            # Filtrar y crear una colección de imágenes Sentinel-2
-            ColeccionSentinel = ee.ImageCollection("COPERNICUS/S2_HARMONIZED") \
-                .filterDate('2018-01-01', '2018-12-30') \
-                .filterBounds(table) \
-                .filterMetadata('CLOUDY_PIXEL_PERCENTAGE', 'Less_Than', 1)
+        # Obtener las colecciones de imágenes para los periodos de tiempo
+        collection1 = getCombinedSRcollection(start_year, start_year, startDay, endDay, aoi)
+        collection2 = getCombinedSRcollection(end_year, end_year, startDay, endDay, aoi)
 
-            Vegetacion = ColeccionSentinel.median().clip(table)
+        # Validar si hay imágenes en las colecciones
 
-            # Filtrar y crear una colección de imágenes Sentinel-2 para un segundo periodo
-            ColeccionSentinel2 = ee.ImageCollection("COPERNICUS/S2_HARMONIZED") \
-                .filterDate('2023-01-01', '2023-12-30') \
-                .filterBounds(table) \
-                .filterMetadata('CLOUDY_PIXEL_PERCENTAGE', 'Less_Than', 1)
-
-            Vegetacion2 = ColeccionSentinel2.median().clip(table)
-                
-            mosaico_bands = Vegetacion.select(['B4', 'B3', 'B2', 'B11', 'B1', 'B12', 'B8', 'B5'])
-            
-            def calculate_ndvi(image):
-                # Calcular NDVI usando la expresión
-                ndvi = image.expression(
-                    'float((NIR - RED) / (NIR + RED))', {
-                    'NIR': image.select('B8'),
-                    'RED': image.select('B4')
-                }).rename('NDVI')  # Renombrar como 'NDVI'
-                
-                # Imprimir NDVI (opcional, principalmente para debugging o exploración)
-                
-                return ndvi
-            
-            def calculate_evi(image):
-                return image.expression(
-                    '2.5 * ((NIR - RED) / (NIR + 6 * RED - 7.5 * BLUE + 1))', {
-                        'NIR': image.select('B8'),
-                        'RED': image.select('B4'),
-                        'BLUE': image.select('B2')
-                    }).rename('EVI')
-                
-            def calculateSAVI(image):
-                L = 0.5  # Factor de corrección del suelo
-                return image.expression(
-                    'float(((NIR - RED) / (NIR + RED + L)) * (1 + L))', {
-                        'NIR': image.select('B8'),
-                        'RED': image.select('B4'),
-                        'L': L
-                    }
-                ).rename('SAVI')
-            
-            def add_indices(image):
-                indices = [
-                    calculate_ndvi(image), calculate_evi(image), calculateSAVI(image)
-                ]
-                return image.addBands(indices)
-            
-            
-            composite_indices1 = add_indices(Vegetacion)
-            composite_indices2 = add_indices(Vegetacion2)
-            
-            composite_clipped=[]
-            
-            if band=="NDVI" :
-                composite_clipped = composite_indices2.select('NDVI').subtract(composite_indices1.select('NDVI')).rename('deltaNDVI').select('deltaNDVI')
-                
-            elif band=="EVI":
-                composite_clipped = composite_indices2.select('EVI').subtract(composite_indices1.select('EVI')).rename('deltaEVI').select('deltaEVI')
-               
-            elif band=="SAVI":
-                composite_clipped = composite_indices2.select('SAVI').subtract(composite_indices1.select('SAVI')).rename('deltaSAVI').select('deltaSAVI')
-            
-
+        # Calcular las imágenes medianas y añadir índices
+        collection1_median = collection1.median().clip(aoi)
+        collection2_median = collection2.median().clip(aoi)
+        composite1 = add_indices(collection1_median)
+        composite2 = add_indices(collection2_median)
+        visualization_parameters={}
+        # Calcular la diferencia de índices
+        if band == "NDVI":
+            delta_index = composite2.select('NDVI').subtract(composite1.select('NDVI')).rename('deltaNDVI')
             visualization_parameters = {
-            'palette':  [
-            'a50026', 'd73027', 'f46d43', 'fdae61', 'fee08b',
-            'ffffbf', 'd9ef8b', 'a6d96a', '66bd63', '1a9850', '006837'
-            ], 'min': -0.8, 'max': 0.8
-                }
-            
-            map_id = composite_clipped.getMapId(visualization_parameters)
-            
-                
-        return jsonify({"success": True, "output": [map_id['tile_fetcher'].url_format, visualization_parameters]}), 200
+            'palette': ['red', 'white', 'green'],  # Paleta de colores
+            'min': -0.25,  # Mínimo valor
+            'max': 0.25    # Máximo valor
+        }
+        elif band == "EVI":
+            delta_index = composite2.select('EVI').subtract(composite1.select('EVI')).rename('deltaEVI')
+            visualization_parameters = {
+            'palette': ['red', 'white', 'green'],  # Paleta de colores
+            'min': -2,  # Mínimo valor
+            'max': 2    # Máximo valor
+        }
+        elif band == "SAVI":
+            delta_index = composite2.select('SAVI').subtract(composite1.select('SAVI')).rename('deltaSAVI')
+            visualization_parameters = {
+            'palette': ['red', 'white', 'green'],  # Paleta de colores
+            'min': -0.25,  # Mínimo valor
+            'max': 0.25    # Máximo valor
+        }
+        else:
+            return jsonify({"error": "Tipo de índice desconocido"}), 400
+
+        # Parámetros de visualización
+        
+
+        # Obtener el mapa y las visualizaciones
+        map_id = delta_index.getMapId(visualization_parameters)
+        bounds=aoi.geometry().getInfo()
+
+        return jsonify({"success": True, "output": [map_id['tile_fetcher'].url_format, visualization_parameters, 'VICI_'+band+'_Result', bounds]}), 200
 
     except Exception as e:
         print(str(e))
         return jsonify({"error": str(e)}), 500
-        
-@app.route('/get_spectral_indexes', methods=['POST'])
+
+
+    except Exception as e:
+        print(str(e))
+        return jsonify({"error": str(e)}), 500
+@app.route('/api/get_spectral_indexes', methods=['POST'])
 def get_spectral_indexes():
     try:
         start_date = request.args.get('startDate')
@@ -302,7 +376,7 @@ def get_spectral_indexes():
         print(str(e))
         return jsonify({"error": str(e)}), 500
 
-@app.route('/spatiotemporal_analysis', methods=['POST'])  
+@app.route('/api/spatiotemporal_analysis', methods=['POST'])  
 def get_spatiotemporal_analysis():
     try:
         if 'aoiDataFiles' not in request.files:
@@ -773,7 +847,7 @@ def get_spatiotemporal_analysis():
         print(str(e))
         return jsonify({"error": str(e)}), 500
      
-@app.route('/rusle', methods=['POST'])  
+@app.route('/api/rusle', methods=['POST'])
 def get_rusle():
     try:
         if 'aoiDataFiles' not in request.files:
@@ -786,100 +860,99 @@ def get_rusle():
 
         with tempfile.TemporaryDirectory() as temp_dir:
             aoi_filepath = os.path.join(temp_dir, secure_filename(aoi_file.filename))
-
             aoi_file.save(aoi_filepath)
 
             # Suponiendo que el shapefile se extrae en el directorio temporal
-                        
             gdf = gpd.read_file(aoi_filepath)
             geojson_dict = gdf.__geo_interface__
             aoi = ee.FeatureCollection(geojson_dict['features'])
             
-            # Cargar la imagen de precipitación mensual
-            clim_rainmap = ee.Image("OpenLandMap/CLM/CLM_PRECIPITATION_SM2RAIN_M/v01")
-
-            # Reducir la imagen para obtener la precipitación anual
-            year = clim_rainmap.reduce(ee.Reducer.sum())
-
-            # Calcular la precipitación mensual ajustada
-            R_monthly = ee.Image(10).pow(ee.Image(1.5).multiply(clim_rainmap.pow(2).divide(year).log10().subtract(-0.08188))).multiply(1.735)
-
-            # Clippear la imagen ajustada por la AOI
-            R_monthly_clipped = R_monthly.clip(aoi)
-
-            # Calcular el factor R sobre la AOI clipeada
-            factorR = R_monthly_clipped.reduce(ee.Reducer.sum())
-
-            # Cargamos toda la informacion necesaria para estimar el factor K
-            sand = ee.Image("OpenLandMap/SOL/SOL_CLAY-WFRACTION_USDA-3A1A1A_M/v02").select('b0')
-            silt = ee.Image('users/aschwantes/SLTPPT_I').divide(100)
-            clay = ee.Image("OpenLandMap/SOL/SOL_SAND-WFRACTION_USDA-3A1A1A_M/v02").select('b0')
-            morg = ee.Image("OpenLandMap/SOL/SOL_ORGANIC-CARBON_USDA-6A1C_M/v02").select('b0').multiply(0.58)
-            sn1 = sand.expression('1 - b0 / 100', {'b0': sand})
-            orgcar = ee.Image("OpenLandMap/SOL/SOL_ORGANIC-CARBON_USDA-6A1C_M/v02").select('b0')
-
-            #Juntando todas las imagenes en una sola
-            soil = ee.Image([sand, silt, clay, morg, sn1, orgcar]).rename(['sand', 'silt', 'clay', 'morg', 'sn1', 'orgcar'] )
-
-            factorK = soil.expression(
-            '(0.2 + 0.3 * exp(-0.0256 * SAND * (1 - (SILT / 100)))) * (1 - (0.25 * CLAY / (CLAY + exp(3.72 - 2.95 * CLAY)))) * (1 - (0.7 * SN1 / (SN1 + exp(-5.51 + 22.9 * SN1))))',
-            {
-                'SAND': soil.select('sand'),
-                'SILT': soil.select('silt'),
-                'CLAY': soil.select('clay'),
-                'MORG': soil.select('morg'),
-                'SN1':  soil.select('sn1'),
-                'CORG': soil.select('orgcar')
-            }).clip(aoi);
-
-            facc = ee.Image("WWF/HydroSHEDS/15ACC")
+            # Definir fechas desde los parámetros del request
+            start_date = request.form.get('startDate')
+            end_date = request.form.get('endDate')
+            
+            # **************** R Factor ***************
+            clim_rainmap = ee.ImageCollection('UCSB-CHG/CHIRPS/DAILY').filterDate(start_date, end_date)
+            annual_rain = clim_rainmap.select('precipitation').sum().clip(aoi)
+            R = annual_rain.multiply(0.363).add(79).rename('R')
+            
+            # Visualización del factor R
+            R_viz_params = {'min': 300, 'max': 900, 'palette': ['a52508', 'ff3818', 'fbff18', '25cdff', '2f35ff', '0b2dab']}
+            
+            # **************** K Factor ***************
+            soil = ee.Image("OpenLandMap/SOL/SOL_SAND-WFRACTION_USDA-3A1A1A_M/v02").select('b0').clip(aoi).rename('soil')
+            K = soil.expression(
+                "(b('soil') > 11) ? 0.0053"
+                ": (b('soil') > 10) ? 0.0170"
+                ": (b('soil') > 9) ? 0.045"
+                ": (b('soil') > 8) ? 0.050"
+                ": (b('soil') > 7) ? 0.0499"
+                ": (b('soil') > 6) ? 0.0394"
+                ": (b('soil') > 5) ? 0.0264"
+                ": (b('soil') > 4) ? 0.0423"
+                ": (b('soil') > 3) ? 0.0394"
+                ": (b('soil') > 2) ? 0.036"
+                ": (b('soil') > 1) ? 0.0341"
+                ": (b('soil') > 0) ? 0.0288"
+                ": 0"
+            ).rename('K').clip(aoi)
+            
+            # Visualización del factor K
+            K_viz_params = {'min': 0, 'max': 0.06, 'palette': ['a52508', 'ff3818', 'fbff18', '25cdff', '2f35ff', '0b2dab']}
+            
+            # **************** LS Factor ***************
             dem = ee.Image("WWF/HydroSHEDS/03CONDEM")
-            slope = ee.Terrain.slope(dem)
+            slope = ee.Terrain.slope(dem).clip(aoi)
+            slope_percent = slope.divide(180).multiply(math.pi).tan().multiply(100)
+            LS4 = math.sqrt(500 / 100)
+            LS = slope_percent.expression(
+                "(b('slope') * 0.53) + (b('slope') * (b('slope') * 0.076)) + 0.76"
+            ).multiply(LS4).rename('LS').clip(aoi)
+            
+            # Visualización del factor LS
+            LS_viz_params = {'min': 0, 'max': 90, 'palette': ['a52508', 'ff3818', 'fbff18', '25cdff', '2f35ff', '0b2dab']}
+            
+            # **************** C Factor **************
 
-            ls_factors = ee.Image([facc, slope]).rename(['facc','slope'])
-
-            factorLS = ls_factors.expression(
-            '(FACC*270/22.13)**0.4*(SLOPE/0.0896)**1.3',
-            {
-                'FACC': ls_factors.select('facc'),
-                'SLOPE': ls_factors.select('slope')
-            }).clip(aoi);
-
-            date1 = '2017-01-01';
-            date2 = '2018-01-01';
-            s2 = ee.ImageCollection("COPERNICUS/S2_HARMONIZED")
-            s23 = s2.filterDate(date1, date2).median().clip(aoi);
-            image_ndvi = s23.normalizedDifference(['B8','B4']).rename("NDVI");
-
-            sentinelCollection = ee.ImageCollection('COPERNICUS/S2_HARMONIZED').filterBounds(aoi).filterDate('2021-01-01', '2021-12-31').filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
-
-            sentinelMedian = sentinelCollection.median();
 
             L = 0.5;
+            # Visualización del factor LS
 
+            
+            # **************** C Factor ***************
+            s2 = ee.ImageCollection("COPERNICUS/S2_HARMONIZED").filterDate(start_date, end_date).median().clip(aoi)
+            ndvi = s2.normalizedDifference(['B8', 'B4']).rename("NDVI")
+            sentinelCollection = ee.ImageCollection('COPERNICUS/S2_HARMONIZED').filterBounds(aoi).filterDate(start_date, end_date).filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
+
+            sentinelMedian = sentinelCollection.median();
             savi = sentinelMedian.expression('((NIR - RED) / (NIR + RED + L)) * (1 + L)', {'NIR': sentinelMedian.select('B8'), 'RED': sentinelMedian.select('B4'), 'L': L }).rename('SAVI');
 
             savi_median = savi
 
-            factorC = ee.Image(0.805).multiply(savi_median).multiply(-1).add(0.431).clip(aoi)
+            C = ee.Image(0.805).multiply(savi_median).multiply(-1).add(0.431).clip(aoi)
 
-            erosion = factorC.multiply(factorR).multiply(factorLS).multiply(factorK)
             
-            l8_viz_params = {'palette': ["#00BFBF", "#00FF00", "#FFFF00", "#FF7F00", "#BF7F3F", "#141414"],'min':0,'max': 6000}
+            # Visualización del factor C
+            C_viz_params = {'min': 0, 'max': 1, 'palette': ['FFFFFF', 'CC9966', 'CC9900', '996600', '33CC00', '009900', '006600', '000000']}
             
-            map_id = erosion.getMapId(l8_viz_params)
+            # **************** Erosion Calculation ***************
+            erosion = R.multiply(K).multiply(LS).multiply(C).rename('erosion')
             
+            erosion_viz_params = {'min': 0, 'max': 10, 'palette': ['#490eff', '#12f4ff', '#12ff50', '#e5ff12', '#ff4812']}
+            
+            # Generar mapa
+            map_id = erosion.getMapId(erosion_viz_params)
+            
+            bounds=aoi.geometry().getInfo()
             return jsonify({
                 "success": True,
-                "output": [map_id['tile_fetcher'].url_format, l8_viz_params]
+                "output": [map_id['tile_fetcher'].url_format, erosion_viz_params, 'Erosion_Result', bounds]
             }), 200
 
-
     except Exception as e:
-        
         return jsonify({"error": str(e)}), 500
 
-@app.route('/list-assets', methods=['GET'])
+@app.route('/api/list-assets', methods=['GET'])
 def list_assets():
     try:
         folder = 'users/jbravo/sps'  # Carpeta de ejemplo, puedes cambiar esto
@@ -894,7 +967,7 @@ def list_assets():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     
-@app.route('/get-map-url', methods=['POST'])
+@app.route('/api/get-map-url', methods=['POST'])
 def get_map_url():
     try:
         data = request.get_json()
@@ -919,12 +992,12 @@ def get_map_url():
         map_id = asset.getMapId(vis_params)  # Obtener el MapID de esa imagen o FeatureCollection
         url = map_id['tile_fetcher'].url_format  # Extraer la URL del mapa
  
-        return jsonify({'map_url': [url, asset_id]})
+        return jsonify({'map_url': [url, vis_params, asset_id]})
     except Exception as e:
         print(str(e))
         return jsonify({'error': str(e)}), 500
     
-@app.route('/soil_organic_prediction', methods=['POST'])
+@app.route('/api/soil_organic_prediction', methods=['POST'])
 def get_image():
     try:
         if 'soilDataFiles' not in request.files or 'aoiDataFiles' not in request.files:
@@ -947,6 +1020,25 @@ def get_image():
             
             data_scale = 20
             
+            start_date = request.form.get('startDate')
+            end_date = request.form.get('endDate')
+            sentinel1 = request.form.get('sentinel1')
+            sentinel2 = request.form.get('sentinel2')
+            landsat = request.form.get('landsat')
+            vegetationIndexes = request.form.get('vegetationIndexes')
+            brightnessIndexes = request.form.get('brightnessIndexes')
+            moistureIndexes = request.form.get('moistureIndexes')
+            numberOfTrees = request.form.get('numberOfTrees')
+            seed = request.form.get('seed')
+            bagFraction = request.form.get('bagFraction')
+            rsquare = request.form.get('rsquare')
+            rmse = request.form.get('rmse')
+            mse = request.form.get('mse')
+            mae = request.form.get('mae')
+            rpiq = request.form.get('rpiq')
+
+
+            
             gdf = gpd.read_file(soil_filepath)
             geojson_dict = gdf.__geo_interface__
             table = ee.FeatureCollection(geojson_dict['features'])
@@ -956,7 +1048,7 @@ def get_image():
             bbox = ee.FeatureCollection(geojson_dict['features'])
             
             coleccion_sentinel = ee.ImageCollection("COPERNICUS/S2_HARMONIZED")\
-            .filterDate('2021-12-30', '2022-12-30')\
+            .filterDate(start_date, end_date)\
             .filterBounds(bbox)\
             .filterMetadata('CLOUDY_PIXEL_PERCENTAGE', 'less_than', 10)
             
@@ -994,6 +1086,7 @@ def get_image():
                     }).rename('NBR2')
                 return nbr2
 
+            #Moisture
             def calculate_ndmi(image):
                 ndmi = image.expression(
                     '(NIR - SWIR) / (NIR + SWIR)', 
@@ -1023,6 +1116,7 @@ def get_image():
                     }).rename('SIPI')
                 return sipi
 
+
             def calculate_rgr(image):
                 rgr = image.expression(
                     'RED / GREEN', 
@@ -1032,6 +1126,7 @@ def get_image():
                     }).rename('RGR')
                 return rgr
 
+            
             def calculate_gli(image):
                 gli = image.expression(
                     '(((GREEN - RED) + (GREEN - BLUE)) / ((2 * GREEN) + RED + BLUE))', 
@@ -1042,6 +1137,7 @@ def get_image():
                     }).rename('GLI')
                 return gli
 
+            #Moisture
             def calculate_msi(image):
                 msi = image.expression(
                     'NIR / SWIR', 
@@ -1051,6 +1147,7 @@ def get_image():
                     }).rename('MSI')
                 return msi
 
+            #Brillo
             def calculate_soci(image):
                 soci = image.expression(
                     'BLUE / (GREEN * RED)', 
@@ -1061,6 +1158,7 @@ def get_image():
                     }).rename('SOCI')
                 return soci
 
+            #Brillo
             def calculate_bi(image):
                 bi = image.expression(
                     'sqrt(((RED * RED) / (GREEN * GREEN)) / 2)', 
@@ -1137,15 +1235,21 @@ def get_image():
             precipitation_stats = statistics(precipitation_1d.map(prec), bbox)
             
             lulc_clipped = lulc.clip(bbox)
-            
-            stack = composite_indices.select("NDVI", "EVI",
+            stack = None
+            if vegetationIndexes == 'true': 
+                stack = composite_indices.select("NDVI", "EVI",
                 "SAVI", "SIPI",
-                "SOCI", "NBR",
-                "BI", "NBR2",
-                "MSI", "RGR",
+                "NBR",
+                "NBR2",
+                "RGR",
                 "ARVI", "GLI", "GCI",
-                "GNDVI", "NDMI","B8", "B11" )
-            
+                "GNDVI","B8", "B11" )
+            if brightnessIndexes == 'true':
+                stack = composite_indices.select(
+                "SOCI", "BI")
+            if moistureIndexes == "true":
+                stack = composite_indices.select("NDMI", "MSI")
+                    
             # Sampling and Classifier
             training_samples = stack.sampleRegions(
                 collection=table,
@@ -1154,7 +1258,8 @@ def get_image():
                 geometries=True
             )
 
-            classifier_rf = ee.Classifier.smileRandomForest(500).setOutputMode('REGRESSION').train(
+	
+            classifier_rf = ee.Classifier.smileRandomForest(numberOfTrees=int(numberOfTrees), bagFraction=float(bagFraction), seed=int(seed)).setOutputMode('REGRESSION').train(
                 features=training_samples,
                 classProperty='SOC',
                 inputProperties=stack.bandNames()
@@ -1164,17 +1269,17 @@ def get_image():
             visualization_parameters = {
                 'min': 0,
                 'max': 6,
-                'palette': ['yellow', 'GreenYellow', 'DarkGreen']
+                'palette': ['#FFFFE5', '#FEE391', '#FEC44F', '#EC7014', '#8C2D04']
             }
             map_id = predicted_soil_carbon.getMapId(visualization_parameters)
             
             return jsonify({
                 "success": True,
-                "output": [map_id['tile_fetcher'].url_format, visualization_parameters]
+                "output": [map_id['tile_fetcher'].url_format, visualization_parameters, 'DSM_Result']
             }), 200
 
-
     except Exception as e:
+        print(str(e))
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':

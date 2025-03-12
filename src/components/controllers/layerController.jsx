@@ -1,7 +1,7 @@
 import React from 'react';
 import Slider from '@material-ui/core/Slider';
 import emitter from '@utils/events.utils';
-import { Card, CardContent, Checkbox, FormControl, Icon, IconButton, InputLabel, List, ListItem, ListItemText, MenuItem, Select, Slide, Tooltip, Typography } from '@material-ui/core';
+import { Card, CardContent, Checkbox, Icon, IconButton, List, ListItem, ListItemText, Slide, Tooltip, Typography } from '@material-ui/core';
 import { MuiThemeProvider, createTheme } from '@material-ui/core/styles';
 
 const GlobalStyles = createTheme({
@@ -33,7 +33,7 @@ const styles = {
         boxShadow: '-6px 6px 15px rgba(0, 0, 0, 0.15)',
     },
     header: {
-        backgroundColor: 'rgb(138, 213, 137)'
+        backgroundColor: 'rgba(253,216,53,255)'
     },
     closeBtn: {
         position: 'absolute',
@@ -71,6 +71,47 @@ const styles = {
     slider: {
         width: '80px', // Adjust the width of the slider
         marginLeft: '10px'
+    },
+    legend: {
+        position: 'absolute',
+        bottom: '30px',
+        left: '10px',
+        background: 'white',
+        padding: '10px',
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '12px',
+        lineHeight: '18px',
+        color: '#333',
+        borderRadius: '3px',
+        boxShadow: '0 0 15px rgba(0, 0, 0, 0.2)'
+    },
+    legendTitle: {
+        margin: '0 0 10px',
+        fontSize: '14px'
+    },
+    legendItem: {
+        display: 'flex',
+        alignItems: 'center',
+        marginBottom: '5px'
+    },
+    legendColorBox: {
+        width: '20px',
+        height: '10px',
+        display: 'inline-block',
+        marginRight: '5px'
+    },
+    spectralLegend: {
+        position: 'absolute',
+        bottom: '30px',
+        left: '10px',
+        background: 'white',
+        padding: '10px',
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '12px',
+        lineHeight: '18px',
+        color: '#333',
+        borderRadius: '3px',
+        boxShadow: '0 0 15px rgba(0, 0, 0, 0.2)'
     }
 };
 
@@ -97,8 +138,8 @@ class LayerController extends React.Component {
     }
 
     truncateLayerName = (name) => {
-        if (name.length > 13) {
-            return name.substring(0, 10) + '...'; // Keep the first 10 characters and add '...'
+        if (name.length > 7) {
+            return name.substring(0, 4) + '...'; // Keep the first 10 characters and add '...'
         }
         return name; // Return the name as is if it's 13 characters or fewer
     }
@@ -190,7 +231,6 @@ class LayerController extends React.Component {
     }; 
 
     componentDidMount() {
-        this.fetchAssets();  // Cargar los assets de GEE
 
         this.openLayerControllerListener = emitter.addListener('openLayerController', () => {
             this.setState({ open: true });
@@ -224,34 +264,95 @@ class LayerController extends React.Component {
         }
     }
 
-    fetchAssets = async () => {
-        try {
-            const response = await fetch('http://localhost:5004/list-assets');
-            const data = await response.json();
-            console.log(data.assets)
-            this.setState({ assets: data.assets });
-        } catch (error) {
-            console.error('Error fetching assets:', error);
-        }
-    };
+    
+getLegendContent = (layerId) => {
+    if (layerId.includes('VICI')) {
+        return (
+            <div style={{ padding: '10px', textAlign: 'center' }}>
+                <Typography><strong>Vegetation Change</strong> %/year</Typography>
+                <div style={{ 
+                    width: '100%', 
+                    height: '20px', 
+                    background: 'linear-gradient(to right, red, white, green)', 
+                    margin: '10px 0', 
+                    borderRadius: '5px' 
+                }}>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2">-2</Typography>
+                    <Typography variant="body2">2</Typography>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2">Decline</Typography>
+                    <Typography variant="body2">Increase</Typography>
+                </div>
+            </div>
+        );
+    } else if (layerId.includes('Erosion')) {
+        return (
+            <div>
+                <Typography><strong>Soil Loss</strong> (t/hac/year)</Typography>
+                                {['#490EFF', '#12F4FF', '#12FF50', '#E5FF12', '#FF4812'].map((color, index) => {
+                    const labels = [
+                        'Slight (<10)',
+                        'Moderate (10-20)',
+                        'High (20-30)',
+                        'Very high (30-40)',
+                        'Severe (>40)'
+                    ];
+                    return (
+                        <div key={index} style={{ display: 'flex', alignItems: 'center' }}>
+                            <span style={{ width: '20px', height: '20px', backgroundColor: color, marginRight: '10px' }}></span>
+                            <Typography>{labels[index]}</Typography>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    } else if (layerId.includes('DSM')) {
+        return (
+            <div>
+                <Typography><strong>DSM</strong> (t/ha)</Typography>
+                {['#ffffe5', '#fee391', '#fec44f', '#ec7014', '#8c2d04'].map((color, index) => {
+                    const labels = [
+                        '0 - 1.2',
+                        '1.2 - 2.4',
+                        '2.4 - 3.6',
+                        '3.6 - 4.8',
+                        '4.8 - 6'
+                    ];
+                    return (
+                        <div key={index} style={{ display: 'flex', alignItems: 'center' }}>
+                            <span style={{ width: '20px', height: '20px', backgroundColor: color, marginRight: '10px' }}></span>
+                            <Typography>{labels[index]}</Typography>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    } else if (layerId.includes('avg')) {
+        return (
+            <div>
+                <Typography><strong>Habitat Suitability</strong></Typography>
+                {['#ffffff', '#cceacc', '#66bf66', '#006600'].map((color, index) => {
+                    const labels = [
+                        'Unsuitable',
+                        'Low suitability',
+                        'Moderate suitability',
+                        'High suitability'
+                    ];
+                    return (
+                        <div key={index} style={{ display: 'flex', alignItems: 'center' }}>
+                            <span style={{ width: '20px', height: '20px', backgroundColor: color, marginRight: '10px' }}></span>
+                            <Typography>{labels[index]}</Typography>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    }
+};
 
-    fetchMapUrl = async (assetId, assetType) => {
-        try {
-            const response = await fetch('http://localhost:5004/get-map-url', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ asset_id: assetId, asset_type: assetType }),
-            });
-            const data = await response.json();
-            console.log(data);
-            this.setState({ mapUrl: data.map_url });
-            emitter.emit('moveURL', [data.map_url, assetId]);  // Emitir evento para Canvas
-        } catch (error) {
-            console.error('Error fetching map URL:', error);
-        }
-    };
 
     handleAssetChange = (event) => {
         const selectedAsset = event.target.value.id;  // Obtenemos el id del asset
@@ -297,34 +398,22 @@ class LayerController extends React.Component {
 
                         <CardContent style={styles.content}>
 
-                        <FormControl style={styles.select}>
-                                <InputLabel>Assets</InputLabel>
-                                <Select
-                                    value={this.state.selectedAsset}
-                                    onChange={this.handleAssetChange}
-                                >
-                                    {this.state.assets.map(asset => (
-                                        <MenuItem
-                                        key={asset.id}
-                                        value={{ id: asset.id, type: asset.type }}  // Pasamos un objeto con id y type
-                                    >
-                                {this.splitAssetName(asset.id)}
-                                </MenuItem>
-                                    ))}
-                                </Select>
-                        </FormControl>
                             
                             <List id="layers" style={styles.layerList}>
-                                {this.state.layers.map(layer => (
+                                                                {this.state.layers.map(layer => (
                                     <ListItem style={styles.layerItem} key={layer.id}>
                                         <ListItemText primary={
                                             <span style={styles.layerText}>
-                                                            <Tooltip title={this.splitAssetName(layer.id)} sx={{ fontSize: '1.2rem' }} // Aumentar el tamaño de la fuente en la tooltip
-                                                            >
-                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
-                {this.truncateLayerName(this.splitAssetName(layer.id))}
-                </span>
-            </Tooltip>
+                                                <Tooltip
+                                                    title={this.getLegendContent(layer.id)}
+                                                    arrow
+                                                >
+                                                    <Icon fontSize="small">troubleshoot</Icon>
+                                                </Tooltip>
+						&nbsp;&nbsp;
+						<Tooltip arrow title={this.splitAssetName(layer.id)} sx={{ fontSize: '1.2rem' }}>
+                                                <span>{this.truncateLayerName(this.splitAssetName(layer.id))}</span>
+						</Tooltip>
                                             </span>
                                         } />
                                         <Checkbox
@@ -337,8 +426,13 @@ class LayerController extends React.Component {
                                             onChange={(e, value) => this.handleTransparencyChange(layer.id, value)}
                                             min={0}
                                             max={100}
-                                            style={{ width: '100px' }}
+                                            style={styles.slider}
                                         />
+			    <Tooltip title="Download this layer" aria-label="Download this layer" enterDelay={200}>
+                                <IconButton className="icon-container modal-trigger" aria-label="Download this layer" color="inherit">
+                                    <Icon style={styles.fontIcon}>download_icon</Icon>
+                                </IconButton>
+                            </Tooltip>
                                     </ListItem>
                                 ))}
                             </List>

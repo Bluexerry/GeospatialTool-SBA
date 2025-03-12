@@ -8,7 +8,9 @@ import AccordionDetails from '@material-ui/core/AccordionDetails';
 import AccordionSummary from '@material-ui/core/AccordionSummary';
 import Typography from '@material-ui/core/Typography';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
+import emitter from '@utils/events.utils';
 import shp from 'shpjs';
+
 
 
 const useStyles = makeStyles((theme) => ({
@@ -76,7 +78,7 @@ export default function ControlledAccordions({onSubmit}) {
     svm: false,
     knn: false,
     aoiDataFiles: [],
-    startDate: "2024-04-14",
+    startDate: "2000-04-14",
     endDate: "2024-05-14",
     satelliteData: {
       sentinel1: false,
@@ -178,9 +180,11 @@ export default function ControlledAccordions({onSubmit}) {
       setLoading(true);
       setTimer(0); // Reset the timer when the submit button is clicked
       const data = new FormData();
-      
+      console.log(formData.endDate);
       data.append('aoiDataFiles', formData.aoiDataFiles[0]);
-
+      data.append('startDate', formData.startDate);
+      data.append('endDate', formData.endDate);
+      console.log(formData)
       for (const key in formData.satelliteData) {
         data.append(key, formData.satelliteData[key]);
       }
@@ -199,7 +203,7 @@ export default function ControlledAccordions({onSubmit}) {
       
       console.log(data);
 
-      const response = await fetch('http://localhost:5004/rusle', {
+      const response = await fetch('https://terrenviron.evenor-tech.com/api/rusle', {
          method: 'POST',
          body: data
       });
@@ -207,13 +211,16 @@ export default function ControlledAccordions({onSubmit}) {
       const result = await response.json();
       if(result){
         console.log('Data sent successfully', result);
-        onSubmit(result);
+        onSubmit(result.output);
         setLoading(false);
+        emitter.emit('closeAllController');
+        emitter.emit('openLayerController');
       }
 
 
     } catch (error) {
       setLoading(false);
+      emitter.emit('showSnackbar', 'error', `Error: '${error}'`);
       console.error('Failed to send data', error);
     }
   };
@@ -234,7 +241,7 @@ export default function ControlledAccordions({onSubmit}) {
           <DropzoneArea
             onChange={(files) => handleFileChange('aoiDataFiles', files)}
             acceptedFiles={['.zip']}
-            dropzoneText="Area of Interest (AOI)"
+            dropzoneText="Area of Interest"
             maxFileSize={5000000}
             filesLimit={1}
             getPreviewIcon={handlePreviewIcon}
@@ -291,7 +298,7 @@ export default function ControlledAccordions({onSubmit}) {
       <Backdrop className={classes.backdrop} open={loading}>
         <CircularProgress color="inherit" />
         <Typography variant="h6" className={classes.progressText}>
-          Ejecutando el modelo... {timer}s
+          Loading... {timer}s
         </Typography>
       </Backdrop>
     </div>

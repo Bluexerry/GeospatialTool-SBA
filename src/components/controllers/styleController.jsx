@@ -19,13 +19,17 @@ const styles = {
         position: 'fixed',
         top: 74,
         right: 10,
-        borderRadius: 4,
+        borderRadius: 9,
         width: 320,
         margin: 0,
-        zIndex: 900
+        zIndex: 900,
+	boxShadow: '-6px 6px 15px rgba(0, 0, 0, 0.15)'
+    },
+    content: {
+        paddingBottom: 16
     },
     header: {
-        backgroundColor: '#f1f1f1'
+        backgroundColor: 'rgba(255,82,82,255)'
     },
     closeBtn: {
         position: 'absolute',
@@ -84,7 +88,7 @@ class StyleController extends React.Component {
                 <Card style={styles.root}>
                     {/* Card header */}
                     <CardContent style={styles.header}>
-                        <Typography gutterBottom variant="h5" component="h2">Map Styles</Typography>
+                        <Typography gutterBottom variant="h5" component="h2" style={{ fontFamily: 'Lato, Arial, sans-serif', color:'white', fontWeight:'3' }}>Map Styles</Typography>
                         <Typography variant="body2" color="textSecondary">Click to choose a map style</Typography>
                         <IconButton style={styles.closeBtn} aria-label="Close" onClick={this.handleCloseClick}>
                             <Icon fontSize="inherit">chevron_right</Icon>
@@ -92,7 +96,7 @@ class StyleController extends React.Component {
                     </CardContent>
 
                     {/* Card content */}
-                    <CardContent>
+                    <CardContent style={styles.content}>
                         <Grid container spacing={2}>
                             {Object.keys(mapStyles).map((item, index) => {
                                 console.log(item)

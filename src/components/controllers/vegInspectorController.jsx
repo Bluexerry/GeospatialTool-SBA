@@ -28,10 +28,11 @@ const styles = {
         position: 'fixed',
         top: 74,
         right: 10,
-        borderRadius: 4,
+        borderRadius: 9,
         minWidth: 350,
         margin: 0,
-        zIndex: 900
+        zIndex: 900,
+        boxShadow: '-6px 6px 15px rgba(0, 0, 0, 0.15)'
     },
     rooot: {
         width: '100%',
@@ -46,7 +47,10 @@ const styles = {
         color: theme.palette.text.secondary,
       },
     header: {
-        backgroundColor: '#f1f1f1'
+        backgroundColor: 'rgba(33,150,243,255)'
+    },
+    content: {
+        paddingBottom: 16
     },
     closeBtn: {
         position: 'absolute',
@@ -393,8 +397,10 @@ class VegInspectorController extends React.Component {
                     <Card style={styles.root}>
                         {/* Card header */}
                         <CardContent style={styles.header}>
-                        <Typography variant="h5" className={styles.title}>Vegetation Index Change Inspector</Typography>
-                        &nbsp;&nbsp;
+                        <Typography gutterBottom variant="h5" component="h2" style={{ fontFamily: 'Lato, Arial, sans-serif', color:'white', fontWeight:'3' }}>Vegetation Change Inspec.</Typography>
+                            <Typography variant="body2" color="textSecondary">Upload your shape and map the veg. index result</Typography>
+			</CardContent>
+			<CardContent style={styles.content}>
                         <ControlledAccordions onSubmit={this.handleDataSubmit}/>
             <IconButton style={styles.closeBtn} aria-label="Close" onClick={this.handleCloseClick}>
                                 <Icon fontSize="inherit">chevron_right</Icon>

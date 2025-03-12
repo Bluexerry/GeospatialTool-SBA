@@ -92,8 +92,8 @@ export default function ControlledAccordions({onSubmit}) {
     },
     modelFeatures: {
       numberOfTrees: 500,
-      seed: 0.0001,
-      bagFraction: 0,
+      seed: 0,
+      bagFraction: 0.5,
     },
     performanceIndicators: {
       rsquare: false,
@@ -125,14 +125,33 @@ export default function ControlledAccordions({onSubmit}) {
 
   const handleChange = (event) => {
     const { name, value, checked, type } = event.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' || type === 'radio' ? checked : value
-    }));
+  
+    setFormData((prev) => {
+      // Desestructurar prev para mantener el estado existente
+      let newState = { ...prev };
+  
+      // Verificar si el nombre del checkbox pertenece a un objeto anidado
+      if (name in newState.satelliteData) {
+        newState.satelliteData[name] = checked;
+      } else if (name in newState.indexes) {
+        newState.indexes[name] = checked;
+      } else if (name in newState.modelFeatures) {
+        newState.modelFeatures[name] = value; // Para los inputs numéricos
+      } else if (name in newState.performanceIndicators) {
+        newState.performanceIndicators[name] = checked;
+      } else {
+        // Para los demás valores (en la raíz de formData)
+        newState[name] = type === 'checkbox' || type === 'radio' ? checked : value;
+      }
+  
+      return newState;
+    });
+  
     if (name === "options") {
       setSelectedOption(value);
     }
   };
+  
 
   const handleFileChange = (name, files) => {
     if (files && files.length > 0) {
@@ -186,7 +205,7 @@ export default function ControlledAccordions({onSubmit}) {
                 value={formData.modelFeatures.seed}
                 onChange={handleChange}
                 type="number"
-                inputProps={{ step: "0.0001" }}
+                inputProps={{ step: "1" }}
               />
             </div>
             &nbsp;&nbsp;
@@ -199,6 +218,8 @@ export default function ControlledAccordions({onSubmit}) {
                 value={formData.modelFeatures.bagFraction}
                 onChange={handleChange}
                 type="number"
+                inputProps={{ step: "0.1" }}
+
               />
             </div>
           </>
@@ -247,6 +268,9 @@ export default function ControlledAccordions({onSubmit}) {
       
       data.append('soilDataFiles', formData.soilDataFiles[0]);
       data.append('aoiDataFiles', formData.aoiDataFiles[0]);
+      data.append('startDate', formData.startDate);
+      data.append('endDate', formData.endDate);
+
 
       for (const key in formData.satelliteData) {
         data.append(key, formData.satelliteData[key]);
@@ -265,8 +289,8 @@ export default function ControlledAccordions({onSubmit}) {
       }
       
       console.log(data);
-
-      const response = await fetch('http://localhost:5004/soil_organic_prediction', {
+      console.log("Aqi")
+      const response = await fetch('https://terrenviron.evenor-tech.com/api/soil_organic_prediction', {
          method: 'POST',
          body: data
       });
@@ -274,7 +298,7 @@ export default function ControlledAccordions({onSubmit}) {
       const result = await response.json();
       if(result){
         console.log('Data sent successfully', result);
-        onSubmit(result);
+        onSubmit(result.output);
         setLoading(false);
       }
 
@@ -305,12 +329,12 @@ export default function ControlledAccordions({onSubmit}) {
               />
               <FormControlLabel
                 value="svm"
-                control={<Radio />}
+                control={<Radio disabled/>}
                 label="SVM"
               />
               <FormControlLabel
                 value="knn"
-                control={<Radio />}
+                control={<Radio disabled/>}
                 label="KNN"
               />
             </RadioGroup>
@@ -326,12 +350,19 @@ export default function ControlledAccordions({onSubmit}) {
           <Typography className={classes.heading}>Upload Files</Typography>
         </AccordionSummary>
         <AccordionDetails>
-          
-
-          <DropzoneArea
+        <DropzoneArea
             onChange={(files) => handleFileChange('aoiDataFiles', files)}
             acceptedFiles={['.zip']}
             dropzoneText="Area of Interest (AOI)"
+            maxFileSize={5000000}
+            filesLimit={1}
+            getPreviewIcon={handlePreviewIcon}
+            />
+
+          <DropzoneArea
+            onChange={(files) => handleFileChange('soilDataFiles', files)}
+            acceptedFiles={['.zip']}
+            dropzoneText="Soil Data Input (SOC)"
             maxFileSize={5000000}
             filesLimit={1}
             getPreviewIcon={handlePreviewIcon}
@@ -405,7 +436,7 @@ export default function ControlledAccordions({onSubmit}) {
                 <Typography variant="subtitle1">Satellite Data:</Typography>
                 <FormGroup>
                   <FormControlLabel
-                    control={<Checkbox name="sentinel1" checked={formData.satelliteData.sentinel1} onChange={handleChange} />}
+                    control={<Checkbox name="sentinel1" checked={formData.satelliteData.sentinel1} onChange={handleChange} disabled/>}
                     label="Sentinel-1"
                   />
                   <FormControlLabel
@@ -413,7 +444,7 @@ export default function ControlledAccordions({onSubmit}) {
                     label="Sentinel-2"
                   />
                   <FormControlLabel
-                    control={<Checkbox name="landsat" checked={formData.satelliteData.landsat} onChange={handleChange} />}
+                    control={<Checkbox name="landsat" checked={formData.satelliteData.landsat} onChange={handleChange} disabled/>}
                     label="Landsat"
                   />
                 </FormGroup>
@@ -498,7 +529,7 @@ export default function ControlledAccordions({onSubmit}) {
       <Backdrop className={classes.backdrop} open={loading}>
         <CircularProgress color="inherit" />
         <Typography variant="h6" className={classes.progressText}>
-          Ejecutando el modelo... {timer}s
+          Loading... {timer}s
         </Typography>
       </Backdrop>
     </div>

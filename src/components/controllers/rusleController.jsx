@@ -29,14 +29,18 @@ const styles = {
         position: 'fixed',
         top: 74,
         right: 10,
-        borderRadius: 4,
+        borderRadius: 9,
         minWidth: 350,
         margin: 0,
-        zIndex: 900
+        zIndex: 900,
+	boxShadow: '-6px 6px 15px rgba(0, 0, 0, 0.15)'
     },
     rooot: {
         width: '100%',
       },
+    content: {
+        paddingBottom: 16
+    },
     heading: {
         fontSize: theme.typography.pxToRem(15),
         flexBasis: '33.33%',
@@ -47,7 +51,7 @@ const styles = {
         color: theme.palette.text.secondary,
       },
     header: {
-        backgroundColor: '#f1f1f1'
+        backgroundColor: 'rgba(76,175,80,255)'
     },
     closeBtn: {
         position: 'absolute',
@@ -567,8 +571,10 @@ class RusleController extends React.Component {
                     <Card style={styles.root}>
                         {/* Card header */}
                         <CardContent style={styles.header}>
-                        <Typography variant="h5" className={styles.title}>RUSLE Modelling</Typography>
-                        &nbsp;&nbsp;
+                        <Typography gutterBottom variant="h5" component="h2" style={{ fontFamily: 'Lato, Arial, sans-serif', color:'white', fontWeight:'3' }}>Soil Erosion Modelling</Typography>
+                        <Typography variant="body2" color="textSecondary">Upload your shape and map the erosion model result</Typography>                    	
+			</CardContent>
+			<CardContent style={styles.content}>
             <ControlledAccordions onSubmit={this.handleDataSubmit}/>
             <IconButton style={styles.closeBtn} aria-label="Close" onClick={this.handleCloseClick}>
                                 <Icon fontSize="inherit">chevron_right</Icon>

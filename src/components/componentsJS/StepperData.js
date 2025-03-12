@@ -21,6 +21,9 @@ const useStyles = makeStyles((theme) => ({
   fileDetails: {
     marginTop: theme.spacing(1),
   },
+  stepIconActive: {
+    color: 'rgba(255,152,0,255)',  // Cambia a cualquier color que desees
+  },
   heading: {
     fontSize: theme.typography.pxToRem(15),
     flexBasis: '33.33%',
@@ -280,7 +283,9 @@ export default function HorizontalLinearStepperData({ onSubmit }) {
         <Stepper activeStep={activeStep} sx={{ width: '80%', marginBottom: 2 }}>
           {steps.map((label) => (
             <Step key={label}>
-              <StepLabel>{label}</StepLabel>
+              <StepLabel StepIconProps={{
+        classes: { active: classes.stepIconActive }
+      }}>{label}</StepLabel>
             </Step>
           ))}
         </Stepper>

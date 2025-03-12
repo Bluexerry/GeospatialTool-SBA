@@ -28,7 +28,7 @@ const styles = {
         position: 'fixed',
         top: 74,
         right: 10,
-        borderRadius: 4,
+        borderRadius: 9,
         minWidth: 350,
         margin: 0,
         zIndex: 900
@@ -36,6 +36,9 @@ const styles = {
     rooot: {
         width: '100%',
       },
+    content: {
+        paddingBottom: 16
+    },
     heading: {
         fontSize: theme.typography.pxToRem(15),
         flexBasis: '33.33%',
@@ -46,7 +49,7 @@ const styles = {
         color: theme.palette.text.secondary,
       },
     header: {
-        backgroundColor: '#f1f1f1'
+        backgroundColor: 'rgba(255,152,0,255)'
     },
     closeBtn: {
         position: 'absolute',
@@ -368,9 +371,11 @@ class SpatioTemporalAnalysisController extends React.Component {
                     <Card style={styles.root}>
                         {/* Card header */}
                         <CardContent style={styles.header}>
-                        <Typography variant="h5" className={styles.title}>Spatiotemporal Analysis</Typography>
-                        &nbsp;&nbsp;
-                        <HorizontalLinearStepperData/>
+                        <Typography gutterBottom style={{ fontFamily: 'Lato, Arial, sans-serif', color:'white', fontWeight:'3' }} variant="h5" component="h2">Spatiotemporal Analysis</Typography>
+                            <Typography variant="body2" color="textSecondary">Upload your shape and obtain your analysis</Typography>
+                        </CardContent>
+		<CardContent style={styles.content}>
+		<HorizontalLinearStepperData/>
             <IconButton style={styles.closeBtn} aria-label="Close" onClick={this.handleCloseClick}>
                                 <Icon fontSize="inherit">chevron_right</Icon>
                             </IconButton>

@@ -44,7 +44,8 @@ const styles = {
         height: 24
     },
     fontIcon: {
-        fontSize: 29
+        fontSize: 29,
+        color: '#FFFFFF'
     },
     toolbar:{
         background: '#89ca92'
@@ -128,12 +129,21 @@ class Navigator extends React.Component {
                         </a>
 
                         {/* Icons */}
+
                         <div style={styles.flexContainer}>
                             <Tooltip title="About" aria-label="About" enterDelay={200}>
                                 <IconButton className="icon-container modal-trigger" aria-label="About" color="inherit" data-target="about">
                                     <Icon style={styles.fontIcon}>info_outline</Icon>
                                 </IconButton>
                             </Tooltip>
+                            <Tooltip title="User Manual" aria-label="User Manual" enterDelay={200}>
+    <a href="" target="_blank" rel="noopener noreferrer" download>
+        <IconButton className="icon-container modal-trigger" aria-label="User Manual" color="inherit" data-target="user_manual">
+            <Icon style={styles.fontIcon}>picture_as_pdf_icon</Icon>
+        </IconButton>
+    </a>
+</Tooltip>
+
                         </div>
                     </Toolbar>
                 </AppBar>

@@ -13,6 +13,7 @@ import { ACCESS_TOKEN } from '@/config';
 import '@styles/map.style.css';
 import emitter from '@utils/events.utils';
 import { mapStyles } from '@utils/map.utils';
+import RequestForm from './componentsJS/RequestForm';
 
 const styles = {
     root: {
@@ -34,13 +35,15 @@ class Canvas extends React.Component {
             popup: null,
             gettingPoint: null,
             tempId: null,
-            styleCode: Object.values(mapStyles)[1].substring(16)
+            styleCode: Object.values(mapStyles)[1].substring(16),
+            accessGranted: false
         };
     }
 
     flyToGeometry(map, geometry) {
         const type = geometry.type;
         let coordinates;
+        console.log(geometry)
 
         if (type === 'FeatureCollection') {
             const firstFeature = geometry.features[0];
@@ -51,19 +54,21 @@ class Canvas extends React.Component {
             coordinates = geometry.coordinates;
         }
 
-        if (geometry.features[0].geometry.type === 'Polygon') {
+        if (geometry.type === 'Polygon') {
+            console.log(coordinates[0][0])
+            console.log(coordinates[0][0][1], coordinates[0][0][0])
             this.state.map.flyTo({
-                center: coordinates[0][0],
+                center: [coordinates[0][0][0], coordinates[0][0][1]],
                 zoom: 15
             });
-        } else if (geometry.features[0].geometry.type === 'Point') {
+        } else if (geometry.type === 'Point') {
             this.state.map.flyTo({
-                center: coordinates,
+                center: [coordinates[0][0], coordinates[0][1]],
                 zoom: 17
             });
         }
     }
-
+    
     removeTempLayer = () => {
         const layers = this.state.map.getStyle().layers;
         this.setState({
@@ -106,6 +111,18 @@ class Canvas extends React.Component {
 
         emitter.emit('handleDatasetRemove');
     }
+
+    handleAccessGranted = (access) => {
+	console.log(access)
+        this.setState({ accessGranted: access });
+	if(access){
+        	emitter.emit('showSnackbar', 'success', `Thank you for filling out the form. Enjoy TERRENVIRON!`);
+	}else{
+        	emitter.emit('showSnackbar', 'error', `Error: Please review the written information`);
+	}
+
+
+    };
 
     add3dLayer = () => {
         var layers = this.state.map.getStyle().layers;
@@ -163,8 +180,8 @@ class Canvas extends React.Component {
         const map = new mapboxgl.Map({
             container: this.mapContainer.current,
             style: Object.values(mapStyles)[0],
-            center: [-6.002481, 37.377469],
-            zoom: 10,
+            center: [23.0000, -26.0000],
+            zoom: 4.75,
             antialias: true
         });
 
@@ -230,31 +247,72 @@ class Canvas extends React.Component {
             // Set point
             emitter.emit('setPoint', e.features[0], this.state.styleCode, this.state.map.getZoom());
 
+
             // Reset state
             this.setState({
                 gettingPoint: false
             })
         });
 
-        this.setMapStyleListener = emitter.addListener('setMapStyle', e => {
-            if (this.state.popup.isOpen()) {
-                this.state.popup.remove();
-            }
-            
-            this.state.map.setStyle(mapStyles[e]);
+	this.setMapStyleListener = emitter.addListener('setMapStyle', e => {
+	    if (this.state.popup.isOpen()) {
+		this.state.popup.remove();
+	    }
 
-            const minimap = new Minimap({
-                center: this.state.map.getCenter(),
-                style: mapStyles[e]
-            });
+	    // Guarda las fuentes y los layers visibles actuales
+	    const currentSources = { ...this.state.map.getStyle().sources };
+	    const currentLayers = [...this.state.map.getStyle().layers];
+	    console.log(currentSources);
+	    console.log(currentLayers);
+	    // Cambia el estilo del mapa
+	    this.state.map.setStyle(mapStyles[e]);
 
-            this.state.map.removeControl(this.state.minimap);
-            this.state.map.addControl(minimap, 'bottom-left');
-            this.setState({
-                minimap: minimap,
-                styleCode: mapStyles[e].substring(16)
-            });
-        }); 
+	    // Espera a que el estilo del mapa se haya cargado antes de agregar las fuentes y layers antiguos
+	    this.state.map.on('style.load', () => {
+		// Agrega las fuentes guardadas, solo si no existen en el nuevo estilo
+		Object.keys(currentSources).forEach(sourceId => {
+		    if (!this.state.map.getSource(sourceId)) {
+		        try {
+		            this.state.map.addSource(sourceId, currentSources[sourceId]);
+		        } catch (error) {
+		            console.error(`Error adding source ${sourceId}:`, error);
+		        }
+		    } else {
+		        console.log(`Source with id "${sourceId}" already exists`);
+		    }
+		});
+
+		// Agrega los layers antiguos, solo si no existen en el nuevo estilo
+		currentLayers.forEach(layer => {
+		    if (!this.state.map.getLayer(layer.id)) {
+		        try {
+		            this.state.map.addLayer(layer);
+		        } catch (error) {
+		            console.error(`Error adding layer ${layer.id}:`, error);
+		        }
+		    } else {
+		        console.log(`Layer with id "${layer.id}" already exists`);
+		    }
+		});
+	    });
+
+	    // Actualiza el minimapa con el nuevo estilo
+	    const minimap = new Minimap({
+		center: this.state.map.getCenter(),
+		style: mapStyles[e]
+	    });
+
+	    this.state.map.removeControl(this.state.minimap);
+	    this.state.map.addControl(minimap, 'bottom-left');
+	    this.setState({
+		minimap: minimap,
+		styleCode: mapStyles[e].substring(16)
+	    });
+	});
+
+
+
+
 
     // Escuchar el evento para cambiar la visibilidad de las capas
         this.toggleLayerVisibilityListener = emitter.addListener('toggleLayerVisibility', (layerId, visible) => {
@@ -359,21 +417,34 @@ class Canvas extends React.Component {
 
     }
 
+    splitAssetName = (assetPath) => {
+        const parts = assetPath.split('/'); // Dividimos el path por "/"
+        let lastPart = parts[parts.length - 1]; // Tomamos la última parte del path
+    
+        // Si el nombre comienza con "0", lo removemos
+        if (lastPart.startsWith('0')) {
+            lastPart = lastPart.substring(1); // Eliminar el primer carácter ("0")
+        }
+        
+        return lastPart; // Devolver la última parte procesada
+    };
+
     handleURLMoved = (movedURL) => {
         console.log('Received moved data:', movedURL);
         // Aquí puedes hacer algo con los datos, como establecer el estado
-        this.setState({ url: movedURL[0][0] });
-        
+        this.setState({ url: movedURL[0] });
+        console.log(movedURL[2]);
         // Emitir el evento con el nombre de la capa y la URL
         emitter.emit('newLayer', {
-            id: movedURL[0][1],  // Nombre de la capa
-            url: movedURL[0][0],  // URL del mapa
+            id: movedURL[2],  // Nombre de la capa
+            url: movedURL[0],  // URL del mapa
             visible: true,
             transparency: 100
         });
         console.log(movedURL)
+        emitter.emit('showSnackbar', 'success', `The layer '${this.splitAssetName(movedURL[2])}' has been loaded`);
         this.state.map.addLayer({
-            'id': movedURL[0][1],
+            'id': movedURL[2],
             'type': 'raster',
             'source': {
                 'type': 'raster',
@@ -386,6 +457,12 @@ class Canvas extends React.Component {
                 'raster-opacity': 0.8  // Opacidad de la capa de ráster
             }
         });
+        const polygon = movedURL[3]; // Asumiendo que contiene el GeoJSON
+        if (polygon && polygon.type === 'Polygon') {
+            this.flyToGeometry(this.state.map, polygon)
+        } else {
+            console.error('Invalid GeoJSON Polygon in movedURL[3]');
+        }
         console.log(this.state.url);
     };
     
@@ -400,8 +477,11 @@ class Canvas extends React.Component {
 
     render() {
         return (
-            <div id="map" style={styles.root} ref={this.mapContainer}>
-            </div>
+            <div>
+            <div id="map" style={styles.root} ref={this.mapContainer}/>
+                            {!this.state.accessGranted && <RequestForm onSubmit={this.handleAccessGranted} />}
+
+                            </div>
         );
     }
 }
