@@ -1,5 +1,5 @@
 # Usar una imagen base de Python
-FROM python:3.10.11
+FROM python:3.10
 
 
 # Instalar dependencias del sistema para Google Cloud SDK
@@ -12,8 +12,11 @@ RUN apt-get update && apt-get install -y google-cloud-sdk && apt-get install -y 
 
 # RUN apt-get update && apt-get install -y jq  # Install jq (if needed)  # Optional for JSON parsing
 
-ENV EARTHENGINE_SERVICE_ACCOUNT_TYPE service_account
-ENV GOOGLE_APPLICATION_CREDENTIALS ./application_default_credentials.json
+# To enable Google Earth Engine, mount your service account key JSON at runtime:
+# docker run -e GOOGLE_APPLICATION_CREDENTIALS=/secrets/gee-key.json \
+#            -v /path/to/key.json:/secrets/gee-key.json ...
+# Or set GOOGLE_APPLICATION_CREDENTIALS in server/.env
+ENV FLASK_APP=app.py
 
 # Establecer el directorio de trabajo
 WORKDIR /app

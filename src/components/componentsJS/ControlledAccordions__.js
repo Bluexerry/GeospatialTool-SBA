@@ -10,6 +10,7 @@ import Typography from '@material-ui/core/Typography';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import emitter from '@utils/events.utils';
 import shp from 'shpjs';
+import { EARTH_ENGINE_API_URL } from '@/config';
 
 
 
@@ -203,7 +204,7 @@ export default function ControlledAccordions({onSubmit}) {
       
       console.log(data);
 
-      const response = await fetch('https://terrenviron.evenor-tech.com/api/rusle', {
+      const response = await fetch(`${EARTH_ENGINE_API_URL}/api/rusle`, {
          method: 'POST',
          body: data
       });

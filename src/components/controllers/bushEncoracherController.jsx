@@ -1,6 +1,7 @@
 import { Card, CardContent, FormControl, Icon, IconButton, InputLabel, MenuItem, Select, Slide, Typography } from '@material-ui/core';
 import { MuiThemeProvider, createTheme } from '@material-ui/core/styles';
 import emitter from '@utils/events.utils';
+import { EARTH_ENGINE_API_URL } from '@/config';
 import React from 'react';
 
 const GlobalStyles = createTheme({
@@ -70,7 +71,7 @@ class BushEncroacher extends React.Component {
 
     fetchAssets = async () => {
         try {
-            const response = await fetch('https://terrenviron.evenor-tech.com/api/list-assets');
+            const response = await fetch(`${EARTH_ENGINE_API_URL}/api/list-assets`);
             const data = await response.json();
             const assets = data.assets;
 
@@ -163,7 +164,7 @@ class BushEncroacher extends React.Component {
 
     fetchMapUrl = async (assetId, assetType) => {
         try {
-            const response = await fetch('https://terrenviron.evenor-tech.com/api/get-map-url', {
+            const response = await fetch(`${EARTH_ENGINE_API_URL}/api/get-map-url`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

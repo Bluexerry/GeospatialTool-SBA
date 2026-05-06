@@ -12,23 +12,32 @@ import json
 import math
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, origins=["https://terrenviron.evenor-tech.com"])
 
-UPLOAD_FOLDER = 'uploads'
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER) 
+_allowed_origins = [o.strip() for o in os.environ.get('ALLOWED_ORIGINS', 'http://localhost:3000').split(',')]
+CORS(app, supports_credentials=True, origins=_allowed_origins)
 
-# Ruta al archivo CSV donde se almacenarán los usuarios
-CSV_FILE_PATH = 'server/earth_engine_service/files/users.csv'
+UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Verifica si el archivo CSV existe, si no, crea uno con los encabezados
+# CSV lives relative to this file, not to the process cwd
+CSV_FILE_PATH = os.path.join(os.path.dirname(__file__), 'files', 'users.csv')
+os.makedirs(os.path.dirname(CSV_FILE_PATH), exist_ok=True)
 if not os.path.exists(CSV_FILE_PATH):
     df = pd.DataFrame(columns=['Email', 'Name', 'Organisation', 'Type_of_Organisation', 'Country'])
     df.to_csv(CSV_FILE_PATH, index=False)
 
-    
-ee.Authenticate(auth_mode="gcloud")
-ee.Initialize(project='soil-values-predictor')
+# ── Earth Engine authentication ───────────────────────────────────────────────
+# Uses service-account credentials via GOOGLE_APPLICATION_CREDENTIALS env var
+# (set in the Dockerfile to ./application_default_credentials.json).
+try:
+    import google.auth
+    credentials, _ = google.auth.default(
+        scopes=['https://www.googleapis.com/auth/earthengine']
+    )
+    ee.Initialize(credentials=credentials, project='soil-values-predictor')
+except Exception as _ee_auth_err:
+    print(f"[earth_engine_service] EE authentication failed: {_ee_auth_err}")
+    # Fall back — service will still start but EE calls will fail at runtime
 
 @app.route('/api/', methods=['GET'])
 def index():

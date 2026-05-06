@@ -19,6 +19,7 @@ import SocController from '../components/controllers/socController'
 import VegInspectorController from '../components/controllers/vegInspectorController';
 import SpatioTemporalAnalysisController from '../components/controllers/spatioTemporalAnalysisController';
 import BushEncroacher from '../components/controllers/bushEncoracherController';
+import FileBrowserController from '../components/controllers/fileBrowserController';
 
 class Main extends React.Component {
     render() {
@@ -38,6 +39,7 @@ class Main extends React.Component {
                     <RusleController />
                     <VegInspectorController/>
                     <SpatioTemporalAnalysisController/>
+                    <FileBrowserController/>
                     <Popup />
                     <Canvas />
                 </React.Fragment>

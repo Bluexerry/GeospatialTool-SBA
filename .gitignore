@@ -74,3 +74,35 @@ typings/
 
 # FuseBox cache
 .fusebox/
+
+# ── Secrets & credentials ────────────────────────────────────────────────────
+server/.env
+**/application_default_credentials.json
+**/soil-values-predictor*.json
+**/credentials/
+.env.local
+.env.*.local
+
+# ── Python virtual environments ───────────────────────────────────────────────
+env_site/
+venv/
+myenv/
+.venv/
+ENV/
+
+# ── Python cache ──────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+
+# ── Build outputs ─────────────────────────────────────────────────────────────
+build/
+dist/
+
+# ── OS artifacts ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~

@@ -13,13 +13,14 @@ import Typography from '@material-ui/core/Typography';
 import indigo from '@material-ui/core/colors/indigo';
 import { MuiThemeProvider, createTheme } from '@material-ui/core/styles';
 import Autocomplete from '@material-ui/lab/Autocomplete';
-import datasets from '@utils/dataset.utils';
+import axios from 'axios';
 import emitter from '@utils/events.utils';
-import axios from "axios";
+import { AUTH_API_URL, DATA_API_URL } from '@/config';
 
+// Local mutable map: catastral_ref → { data: geojson }
+const datasets = {};
 
-axios.defaults.baseURL = 'http://localhost:5000';  // Asegúrate de que la URL base es correcta
-axios.defaults.withCredentials = true; // Importante para enviar cookies
+// Each axios call specifies a full URL — no global baseURL to avoid conflicts.
 
 const theme = createTheme({
     palette: {
@@ -31,22 +32,19 @@ const theme = createTheme({
 
 const catastralList = ["41046A010000100000DU","41041A014001860000HF","41041A014001790000HQ", "41041A015002920000HF", "41041A015002760000HH", "41041A015002730000HS", "41041A014000920000HF", "41041A007003790000HK", "41041A005000430000HO"];
 
-const apiUrl = 'http://localhost:5000';
-
-
 axios.interceptors.request.use(
     config => {
-      const { origin } = new URL(config.url);
-      const allowedOrigins = [apiUrl];
-      const token = localStorage.getItem('token');
-      if (allowedOrigins.includes(origin)) {
-        config.headers.authorization = `Bearer ${token}`;
-      }
+      try {
+        const { origin } = new URL(config.url);
+        const allowedOrigins = [AUTH_API_URL, DATA_API_URL];
+        const token = localStorage.getItem('token');
+        if (allowedOrigins.includes(origin) && token) {
+          config.headers.authorization = `Bearer ${token}`;
+        }
+      } catch (_) { /* relative URLs – skip */ }
       return config;
     },
-    error => {
-      return Promise.reject(error);
-    }
+    error => Promise.reject(error)
   );
 
 const styles = {
@@ -135,7 +133,7 @@ class Login extends React.Component {
 
     getUserParcels = async (userId) => {
         try {
-            const response = await axios.get(`http://localhost:5000/users/${userId}/parcels`);
+            const response = await axios.get(`${DATA_API_URL}/users/${userId}/parcels`);
             if (response.status === 200) {
                 this.updateDatasetUtilsFile(response.data);
                 console.log("Parcelas recibidas:", response.data);
@@ -174,7 +172,7 @@ class Login extends React.Component {
           };
         // Generate request parameters
         const response = await axios.post(
-            "http://localhost:5000/login",
+            `${AUTH_API_URL}/login`,
             newUser
           );
 

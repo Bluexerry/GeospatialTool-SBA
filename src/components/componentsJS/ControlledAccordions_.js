@@ -9,6 +9,7 @@ import AccordionSummary from '@material-ui/core/AccordionSummary';
 import Typography from '@material-ui/core/Typography';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import emitter from '@utils/events.utils';
+import { EARTH_ENGINE_API_URL } from '@/config';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -116,7 +117,7 @@ export default function ControlledAccordions({ onSubmit }) {
       data.append('startDate', formData.startDate);
       data.append('endDate', formData.endDate);
 
-      const response = await fetch('https://terrenviron.evenor-tech.com/api/vegetation_index_change_inspector', {
+      const response = await fetch(`${EARTH_ENGINE_API_URL}/api/vegetation_index_change_inspector`, {
         method: 'POST',
         body: data,
       });

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { TextField, Button, Grid, FormControl, FormLabel, RadioGroup, FormControlLabel, Radio, Typography } from '@mui/material';
-import CountrySelect from './CountrySelect';  // Importar el selector de país
+import CountrySelect from './CountrySelect';
+import { EARTH_ENGINE_API_URL } from '@/config';
 
 const RequestForm = ({ onSubmit }) => {
     const [email, setEmail] = useState('');
@@ -56,37 +57,65 @@ const RequestForm = ({ onSubmit }) => {
         borderTopRightRadius: '8px',
     };
 
-    const handleSubmit = async () => {
-	const data = {
-		email: email,
-		name: name,
-		organisation: organisation,
-		type_of_organisation: showOtherField ? otherOrganisation : typeOfOrganisation,
-		country: country
-	};
-
-	try {
-		const response = await fetch('https://terrenviron.evenor-tech.com/api/register_user', {
-		    method: 'POST',
-		    headers: {
-			'Content-Type': 'application/json',
-		    },
-		    body: JSON.stringify(data)
-	});
-
-	const result = await response.json();
+    const handleSubmit = async () => {
+
+	const data = {
+
+		email: email,
+
+		name: name,
+
+		organisation: organisation,
+
+		type_of_organisation: showOtherField ? otherOrganisation : typeOfOrganisation,
+
+		country: country
+
+	};
+
+
+
+	try {
+
+		const response = await fetch(`${EARTH_ENGINE_API_URL}/api/register_user`, {
+
+		    method: 'POST',
+
+		    headers: {
+
+			'Content-Type': 'application/json',
+
+		    },
+
+		    body: JSON.stringify(data)
+
+	});
+
+
+
+	const result = await response.json();
+
 	if (result.success) {
-	    onSubmit(true);
-	    console.log("User registered successfully");
+	    onSubmit(true);
+
+	    console.log("User registered successfully");
+
 	} else {
-	    onSubmit(false);
-	    console.error(result.error);
-	}
+	    onSubmit(false);
+
+	    console.error(result.error);
+
+	}
+
 	   } catch (error) {
-	onSubmit(false);
-	console.error('Error:', error);
-	    }
-    };
+	onSubmit(false);
+
+	console.error('Error:', error);
+
+	    }
+
+    };
+
 
 
     return (

@@ -9,6 +9,7 @@ import AccordionSummary from '@material-ui/core/AccordionSummary';
 import Typography from '@material-ui/core/Typography';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import shp from 'shpjs';
+import { EARTH_ENGINE_API_URL } from '@/config';
 
 
 const useStyles = makeStyles((theme) => ({
@@ -290,7 +291,7 @@ export default function ControlledAccordions({onSubmit}) {
       
       console.log(data);
       console.log("Aqi")
-      const response = await fetch('https://terrenviron.evenor-tech.com/api/soil_organic_prediction', {
+      const response = await fetch(`${EARTH_ENGINE_API_URL}/api/soil_organic_prediction`, {
          method: 'POST',
          body: data
       });
