@@ -1,4 +1,4 @@
-FROM python:3.10
+FROM python:3.10-slim
 
 WORKDIR /app
 
@@ -11,4 +11,4 @@ ENV FLASK_APP=app.py
 
 EXPOSE 5005
 
-CMD ["flask", "run", "--host=0.0.0.0", "--port=5005"]
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5005", "app:app"]

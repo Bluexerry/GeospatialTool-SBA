@@ -1,11 +1,11 @@
 -- ─── GeospatialTool-SBA  ·  Database initialisation ──────────────────────────
--- Passwords stored as MD5 hex digest (frontend sends md5(plaintext)).
--- Default test user: admin / password  →  md5('password') = 5f4dcc3b5aa765d61d8327deb882cf99
+-- Passwords stored as bcrypt hashes (cost 12). Frontend sends plaintext over HTTPS.
+-- Default test user: admin / password
 
 CREATE TABLE IF NOT EXISTS users (
     id          SERIAL PRIMARY KEY,
     username    VARCHAR(120) UNIQUE NOT NULL,
-    password    VARCHAR(64)  NOT NULL,   -- MD5 hex digest
+    password    VARCHAR(72)  NOT NULL,   -- bcrypt hash (60 chars + null terminator)
     email       VARCHAR(254),
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
@@ -44,5 +44,5 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Seed: default admin user (password = "password")
 INSERT INTO users (username, password, email)
-VALUES ('admin', '5f4dcc3b5aa765d61d8327deb882cf99', 'admin@example.com')
+VALUES ('admin', '$2b$12$GY3S9Ll1dWW02kH1DPoAA.SVq1s5A4ZGAsdk9UU2QFuNSSqLIh10O', 'admin@example.com')
 ON CONFLICT (username) DO NOTHING;

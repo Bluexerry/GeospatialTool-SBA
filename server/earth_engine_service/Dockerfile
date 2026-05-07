@@ -1,5 +1,5 @@
 # Usar una imagen base de Python
-FROM python:3.10
+FROM python:3.10-slim
 
 
 # Instalar dependencias del sistema para Google Cloud SDK
@@ -32,4 +32,4 @@ COPY . .
 EXPOSE 5004
 
 # Comando para ejecutar la aplicación
-CMD ["flask", "run", "--host=0.0.0.0", "--port=5004"]
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5004", "app:app"]

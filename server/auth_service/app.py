@@ -1,4 +1,5 @@
 import os
+import bcrypt
 import psycopg2
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -39,12 +40,12 @@ def index():
 def login():
     """Authenticate a user.
 
-    Expects JSON body: {"username": "...", "password": "<md5-hex>"}
+    Expects JSON body: {"username": "...", "password": "<plaintext>"}
     Returns: {"message": [user_id, access_token]}
     """
     data = request.get_json(silent=True) or {}
     username = data.get('username', '').strip()
-    password = data.get('password', '').strip()   # MD5 hex digest from frontend
+    password = data.get('password', '').strip()
 
     if not username or not password:
         return jsonify({"msg": "Username and password are required"}), 400
@@ -53,8 +54,8 @@ def login():
         conn = get_db()
         cur = conn.cursor()
         cur.execute(
-            "SELECT id FROM users WHERE username = %s AND password = %s",
-            (username, password)
+            "SELECT id, password FROM users WHERE username = %s",
+            (username,)
         )
         row = cur.fetchone()
         cur.close()
@@ -62,12 +63,47 @@ def login():
     except Exception as e:
         return jsonify({"msg": f"Database error: {str(e)}"}), 500
 
-    if row is None:
+    if row is None or not bcrypt.checkpw(password.encode('utf-8'), row[1].encode('utf-8')):
         return jsonify({"msg": "Credenciales incorrectas"}), 401
 
     user_id = row[0]
     access_token = create_access_token(identity=str(user_id))
     return jsonify({"message": [user_id, access_token]}), 200
+
+
+@app.route('/register', methods=['POST'])
+def register():
+    """Register a new user.
+
+    Expects JSON body: {"username": "...", "password": "<plaintext>", "email": "..."}
+    """
+    data = request.get_json(silent=True) or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    email = data.get('email', '').strip() or None
+
+    if not username or not password:
+        return jsonify({"error": "username and password are required"}), 400
+
+    hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO users (username, password, email) VALUES (%s, %s, %s) RETURNING id",
+            (username, hashed, email)
+        )
+        new_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        conn.close()
+    except psycopg2.errors.UniqueViolation:
+        return jsonify({"error": "Username already exists"}), 409
+    except Exception as e:
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
+
+    return jsonify({"message": f"User {username} registered", "id": new_id}), 201
 
 
 if __name__ == '__main__':

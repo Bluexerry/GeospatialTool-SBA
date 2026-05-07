@@ -137,7 +137,8 @@ class Navigator extends React.Component {
                                 </IconButton>
                             </Tooltip>
                             <Tooltip title="User Manual" aria-label="User Manual" enterDelay={200}>
-    <a href="" target="_blank" rel="noopener noreferrer" download>
+    {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
+    <a href="#" target="_blank" rel="noopener noreferrer">
         <IconButton className="icon-container modal-trigger" aria-label="User Manual" color="inherit" data-target="user_manual">
             <Icon style={styles.fontIcon}>picture_as_pdf_icon</Icon>
         </IconButton>

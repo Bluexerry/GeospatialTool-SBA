@@ -76,8 +76,7 @@ typings/
 .fusebox/
 
 # ── Secrets & credentials ────────────────────────────────────────────────────
-server/.env
-**/application_default_credentials.json
+server/.envsecrets/**/application_default_credentials.json
 **/soil-values-predictor*.json
 **/credentials/
 .env.local

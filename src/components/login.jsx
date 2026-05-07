@@ -1,6 +1,5 @@
 /* Written by Ye Liu */
 
-import md5 from 'md5';
 import React from 'react';
 
 import Button from '@material-ui/core/Button';
@@ -162,47 +161,45 @@ class Login extends React.Component {
     }    
 
     handleLoginClick = async () => {
-        // Show button progress
-        this.setState({
-            logining: true
-        });
-        const newUser = {
+        this.setState({ logining: true });
+        const payload = {
             username: document.getElementById('username').value,
-            password: md5(document.getElementById('password').value),
-          };
-        // Generate request parameters
-        const response = await axios.post(
-            `${AUTH_API_URL}/login`,
-            newUser
-          );
+            password: document.getElementById('password').value,
+        };
+        try {
+            const response = await axios.post(`${AUTH_API_URL}/login`, payload);
+            if (response.status === 200) {
+                const userID = response.data.message[0];
+                const token  = response.data.message[1];
+                emitter.emit('handleToken', token);
+                localStorage.removeItem('token');
+                localStorage.removeItem('jwt');
+                localStorage.setItem('token', token);
+                emitter.emit('showSnackbar', 'success', 'User login successfully.');
+                emitter.emit('setLoginState', true);
+                this.getUserParcels(userID);
+                this.setState({ open: false, logining: false, idUser: userID });
+            }
+        } catch (err) {
+            emitter.emit('showSnackbar', 'error', 'Credenciales incorrectas.');
+            this.setState({ logining: false });
+        }
+    }
 
-
-        if(response.status===200){
-            const userID = response.data.message[0];
-            const token = response.data.message[1];
-            emitter.emit('handleToken', token); // Emitiendo el evento con los datos
-
-            localStorage.removeItem('token'); 
-            localStorage.removeItem('jwt');
-            // Limpiar token anterior
-            localStorage.setItem('token', token);  // Almacenar nuevo token
-
-            emitter.emit('showSnackbar', 'success', `User login successfully.`);
-            emitter.emit('setLoginState', true);
-
-            this.getUserParcels(userID);
-
-            // Actualizar el estado una sola vez
-            this.setState({
-                open: false,
-                logining: false,
-                idUser: userID
-            });
-
-            console.log(localStorage.getItem('token'))
-
-        }else{
-
+    handleRegisterClick = async () => {
+        this.setState({ logining: true });
+        const payload = {
+            username: document.getElementById('username').value,
+            password: document.getElementById('password').value,
+        };
+        try {
+            await axios.post(`${AUTH_API_URL}/register`, payload);
+            emitter.emit('showSnackbar', 'success', 'Usuario registrado. Inicia sesión.');
+            this.setState({ mode: 'login', logining: false });
+        } catch (err) {
+            const msg = (err.response && err.response.data && err.response.data.error) || 'Error al registrar.';
+            emitter.emit('showSnackbar', 'error', msg);
+            this.setState({ logining: false });
         }
     }
 
@@ -298,7 +295,10 @@ class Login extends React.Component {
 }
 
                         <div style={styles.loginBtnContainer}>
-                            <Button style={styles.loginBtn} variant="contained" color="primary" disabled={this.state.logining} onClick={this.handleLoginClick}>INICIAR SESIÓN</Button>
+                            <Button style={styles.loginBtn} variant="contained" color="primary" disabled={this.state.logining}
+                                onClick={this.state.mode === 'login' ? this.handleLoginClick : this.handleRegisterClick}>
+                                {this.state.mode === 'login' ? 'INICIAR SESIÓN' : 'REGISTRAR'}
+                            </Button>
                             {this.state.logining && <CircularProgress style={styles.loginBtnProgress} size={24} />}
                             <Button style={styles.loginBtn} onClick={this.handleChangeForm} color="primary">
                             {this.state.mode === 'login' ? 'Register' : 'Login'}
