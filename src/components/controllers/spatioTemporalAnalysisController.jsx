@@ -13,7 +13,7 @@ import emitter from '@utils/events.utils';
 import { ACCESS_TOKEN } from '@/config';
 
 import '@styles/dataController.style.css';
-import HorizontalLinearStepperData from '../componentsJS/StepperData';
+import HorizontalLinearStepperData from '../ui/StepperData';
 
 const theme = createTheme({
     palette: {

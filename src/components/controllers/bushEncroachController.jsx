@@ -60,7 +60,7 @@ class BushEncroacher extends React.Component {
     componentDidMount() {
         this.fetchAssets();  // Cargar los assets de GEE
 
-        this.openBushEncroacherControllerListener = emitter.addListener('openBushEncoracherController', () => {
+        this.openBushEncroachControllerListener = emitter.addListener('openBushEncroachController', () => {
             this.setState({ open: true });
         });
 
@@ -183,7 +183,7 @@ class BushEncroacher extends React.Component {
     };
 
     componentWillUnmount() {
-        emitter.removeListener(this.openBushEncroacherControllerListener);
+        emitter.removeListener(this.openBushEncroachControllerListener);
         emitter.removeListener(this.closeAllControllerListener);
         emitter.removeListener(this.setMapZoomListener);
         emitter.removeListener(this.handleDatasetRemoveListener);

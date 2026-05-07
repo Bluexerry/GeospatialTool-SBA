@@ -12,7 +12,7 @@ import Icon from '@material-ui/core/Icon';
 
 import emitter from '@utils/events.utils';
 import { mapStyles } from '@utils/map.utils';
-import '@styles/styleController.style.css';
+import './styleController.css';
 
 const styles = {
     root: {

@@ -46,6 +46,9 @@ services:
       - .env
     environment:
       FLASK_APP: app.py
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gee-key.json
+    volumes:
+      - ${GEE_KEY_PATH}:/run/secrets/gee-key.json:ro
     networks:
       - backend
 

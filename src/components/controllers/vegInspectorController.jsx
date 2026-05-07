@@ -13,7 +13,7 @@ import emitter from '@utils/events.utils';
 import { ACCESS_TOKEN } from '@/config';
 
 import '@styles/dataController.style.css';
-import ControlledAccordions from '@components/componentsJS/ControlledAccordions_';
+import ControlledAccordions from '@components/ui/VegIndexForm';
 
 const theme = createTheme({
     palette: {

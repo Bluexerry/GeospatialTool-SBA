@@ -18,7 +18,7 @@ import RusleController from '../components/controllers/rusleController';
 import SocController from '../components/controllers/socController'
 import VegInspectorController from '../components/controllers/vegInspectorController';
 import SpatioTemporalAnalysisController from '../components/controllers/spatioTemporalAnalysisController';
-import BushEncroacher from '../components/controllers/bushEncoracherController';
+import BushEncroacher from '../components/controllers/bushEncroachController';
 import FileBrowserController from '../components/controllers/fileBrowserController';
 
 class Main extends React.Component {

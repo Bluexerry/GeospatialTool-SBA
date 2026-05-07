@@ -6,7 +6,7 @@ import { withSnackbar } from 'notistack';
 import Button from '@material-ui/core/Button';
 
 import emitter from '@utils/events.utils';
-import '@styles/snackbar.style.css';
+import './snackbar.css';
 
 class Snackbar extends React.Component {
     state = {

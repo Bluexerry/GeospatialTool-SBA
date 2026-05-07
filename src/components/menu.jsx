@@ -12,7 +12,7 @@ import Icon from '@material-ui/core/Icon';
 
 import emitter from '@utils/events.utils';
 
-import '@styles/menu.style.css';
+import './menu.css';
 
 const styles = {
 
@@ -130,7 +130,7 @@ class Menu extends React.Component {
 
                     emitter.emit('closeAllController');
 
-                    emitter.emit('openBushEncoracherController');
+                    emitter.emit('openBushEncroachController');
 
                     this.handleClose();
 

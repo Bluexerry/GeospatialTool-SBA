@@ -10,10 +10,10 @@ import marker from '@plugins/marker.plugin';
 import Minimap from '@plugins/minimap.plugin';
 
 import { ACCESS_TOKEN } from '@/config';
-import '@styles/map.style.css';
+import './map.css';
 import emitter from '@utils/events.utils';
 import { mapStyles } from '@utils/map.utils';
-import RequestForm from './componentsJS/RequestForm';
+import RequestForm from './ui/RequestForm';
 
 const styles = {
     root: {

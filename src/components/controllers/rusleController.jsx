@@ -14,7 +14,7 @@ import emitter from '@utils/events.utils';
 import { ACCESS_TOKEN } from '@/config';
 
 import '@styles/dataController.style.css';
-import ControlledAccordions from '@components/componentsJS/ControlledAccordions__';
+import ControlledAccordions from '@components/ui/RusleForm';
 
 const theme = createTheme({
     palette: {

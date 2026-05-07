@@ -3,7 +3,6 @@ from werkzeug.utils import secure_filename
 from flask_cors import CORS
 import geopandas as gpd
 import pandas as pd
-import zipfile
 import ee
 import requests
 import os
@@ -279,10 +278,6 @@ def vegetation_index_change_inspector():
         print(str(e))
         return jsonify({"error": str(e)}), 500
 
-
-    except Exception as e:
-        print(str(e))
-        return jsonify({"error": str(e)}), 500
 @app.route('/api/get_spectral_indexes', methods=['POST'])
 def get_spectral_indexes():
     try:
