@@ -75,44 +75,22 @@ const RequestForm = ({ onSubmit }) => {
 
 
 
-	try {
+    try {
+        const response = await fetch(`${EARTH_ENGINE_API_URL}/api/register_user`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
 
-		const response = await fetch(`${EARTH_ENGINE_API_URL}/api/register_user`, {
-
-		    method: 'POST',
-
-		    headers: {
-
-			'Content-Type': 'application/json',
-
-		    },
-
-		    body: JSON.stringify(data)
-
-	});
-
-
-
-	const result = await response.json();
-
-	if (result.success) {
-	    onSubmit(true);
-
-	    console.log("User registered successfully");
-
-	} else {
-	    onSubmit(false);
-
-	    console.error(result.error);
-
-	}
-
-	   } catch (error) {
-	onSubmit(false);
-
-	console.error('Error:', error);
-
-	    }
+        const result = await response.json();
+        if (result.success) {
+            onSubmit(true, null);
+        } else {
+            onSubmit(false, result.error || 'Please review the written information');
+        }
+    } catch (error) {
+        onSubmit(false, 'network');
+    }
 
     };
 

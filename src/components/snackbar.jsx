@@ -26,9 +26,6 @@ class Snackbar extends React.Component {
         );
         // Bind event listeners
         this.showSnackbarListener = emitter.addListener('showSnackbar', (variant, message) => {
-            // Show snackbar
-            console.log(message)
-
             this.props.enqueueSnackbar(message, {
                 variant: variant,
                 autoHideDuration: 3000,

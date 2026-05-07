@@ -383,7 +383,6 @@ getLegendContent = (layerId) => {
     }
 
     render() {
-        console.log(this.state.layers)
         return (
             <MuiThemeProvider theme={GlobalStyles}>
                 <Slide direction="left" in={this.state.open}>

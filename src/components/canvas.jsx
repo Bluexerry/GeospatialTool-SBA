@@ -15,6 +15,66 @@ import emitter from '@utils/events.utils';
 import { mapStyles } from '@utils/map.utils';
 import RequestForm from './ui/RequestForm';
 
+// mapbox-gl-draw default theme with line-dasharray wrapped in ['literal', [...]]
+// to satisfy mapbox-gl v1 expression validation (raw arrays inside case expressions
+// are interpreted as sub-expressions, not literal values).
+const DRAW_STYLES = [
+    {
+        id: 'gl-draw-polygon-fill', type: 'fill',
+        filter: ['all', ['==', '$type', 'Polygon']],
+        paint: {
+            'fill-color': ['case', ['==', ['get', 'active'], 'true'], '#fbb03b', '#3bb2d0'],
+            'fill-opacity': 0.1,
+        },
+    },
+    {
+        id: 'gl-draw-lines', type: 'line',
+        filter: ['any', ['==', '$type', 'LineString'], ['==', '$type', 'Polygon']],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+            'line-color': ['case', ['==', ['get', 'active'], 'true'], '#fbb03b', '#3bb2d0'],
+            'line-width': 2,
+        },
+    },
+    {
+        id: 'gl-draw-point-outer', type: 'circle',
+        filter: ['all', ['==', '$type', 'Point'], ['==', 'meta', 'feature']],
+        paint: {
+            'circle-radius': ['case', ['==', ['get', 'active'], 'true'], 7, 5],
+            'circle-color': '#fff',
+        },
+    },
+    {
+        id: 'gl-draw-point-inner', type: 'circle',
+        filter: ['all', ['==', '$type', 'Point'], ['==', 'meta', 'feature']],
+        paint: {
+            'circle-radius': ['case', ['==', ['get', 'active'], 'true'], 5, 3],
+            'circle-color': ['case', ['==', ['get', 'active'], 'true'], '#fbb03b', '#3bb2d0'],
+        },
+    },
+    {
+        id: 'gl-draw-vertex-outer', type: 'circle',
+        filter: ['all', ['==', '$type', 'Point'], ['==', 'meta', 'vertex'], ['!=', 'mode', 'simple_select']],
+        paint: {
+            'circle-radius': ['case', ['==', ['get', 'active'], 'true'], 7, 5],
+            'circle-color': '#fff',
+        },
+    },
+    {
+        id: 'gl-draw-vertex-inner', type: 'circle',
+        filter: ['all', ['==', '$type', 'Point'], ['==', 'meta', 'vertex'], ['!=', 'mode', 'simple_select']],
+        paint: {
+            'circle-radius': ['case', ['==', ['get', 'active'], 'true'], 5, 3],
+            'circle-color': '#fbb03b',
+        },
+    },
+    {
+        id: 'gl-draw-midpoint', type: 'circle',
+        filter: ['all', ['==', 'meta', 'midpoint']],
+        paint: { 'circle-radius': 3, 'circle-color': '#fbb03b' },
+    },
+];
+
 const styles = {
     root: {
         width: '100%',
@@ -36,6 +96,7 @@ class Canvas extends React.Component {
             gettingPoint: null,
             tempId: null,
             styleCode: Object.values(mapStyles)[1].substring(16),
+            loggedIn: false,
             accessGranted: false
         };
     }
@@ -43,7 +104,6 @@ class Canvas extends React.Component {
     flyToGeometry(map, geometry) {
         const type = geometry.type;
         let coordinates;
-        console.log(geometry)
 
         if (type === 'FeatureCollection') {
             const firstFeature = geometry.features[0];
@@ -55,8 +115,6 @@ class Canvas extends React.Component {
         }
 
         if (geometry.type === 'Polygon') {
-            console.log(coordinates[0][0])
-            console.log(coordinates[0][0][1], coordinates[0][0][0])
             this.state.map.flyTo({
                 center: [coordinates[0][0][0], coordinates[0][0][1]],
                 zoom: 15
@@ -112,16 +170,15 @@ class Canvas extends React.Component {
         emitter.emit('handleDatasetRemove');
     }
 
-    handleAccessGranted = (access) => {
-	console.log(access)
+    handleAccessGranted = (access, errorType) => {
         this.setState({ accessGranted: access });
-	if(access){
-        	emitter.emit('showSnackbar', 'success', `Thank you for filling out the form. Enjoy TERRENVIRON!`);
-	}else{
-        	emitter.emit('showSnackbar', 'error', `Error: Please review the written information`);
-	}
-
-
+        if (access) {
+            emitter.emit('showSnackbar', 'success', 'Thank you for filling out the form. Enjoy TERRENVIRON!');
+        } else if (errorType === 'network') {
+            emitter.emit('showSnackbar', 'error', 'Service unavailable. Please try again later or contact the administrator.');
+        } else {
+            emitter.emit('showSnackbar', 'error', 'Error: ' + (errorType || 'Please review the written information'));
+        }
     };
 
     add3dLayer = () => {
@@ -186,6 +243,7 @@ class Canvas extends React.Component {
         });
 
         const draw = new MapboxDraw({
+            styles: DRAW_STYLES,
             controls: {
                 combine_features: false,
                 uncombine_features: false
@@ -415,6 +473,10 @@ class Canvas extends React.Component {
 
         emitter.on('moveURL', this.handleURLMoved);
 
+        this.setLoginStateListener = emitter.addListener('setLoginState', (state) => {
+            this.setState({ loggedIn: state });
+        });
+
     }
 
     splitAssetName = (assetPath) => {
@@ -430,18 +492,13 @@ class Canvas extends React.Component {
     };
 
     handleURLMoved = (movedURL) => {
-        console.log('Received moved data:', movedURL);
-        // Aquí puedes hacer algo con los datos, como establecer el estado
         this.setState({ url: movedURL[0] });
-        console.log(movedURL[2]);
-        // Emitir el evento con el nombre de la capa y la URL
         emitter.emit('newLayer', {
-            id: movedURL[2],  // Nombre de la capa
-            url: movedURL[0],  // URL del mapa
+            id: movedURL[2],
+            url: movedURL[0],
             visible: true,
             transparency: 100
         });
-        console.log(movedURL)
         emitter.emit('showSnackbar', 'success', `The layer '${this.splitAssetName(movedURL[2])}' has been loaded`);
         this.state.map.addLayer({
             'id': movedURL[2],
@@ -457,16 +514,14 @@ class Canvas extends React.Component {
                 'raster-opacity': 0.8  // Opacidad de la capa de ráster
             }
         });
-        const polygon = movedURL[3]; // Asumiendo que contiene el GeoJSON
+        const polygon = movedURL[3];
         if (polygon && polygon.type === 'Polygon') {
-            this.flyToGeometry(this.state.map, polygon)
-        } else {
-            console.error('Invalid GeoJSON Polygon in movedURL[3]');
+            this.flyToGeometry(this.state.map, polygon);
         }
-        console.log(this.state.url);
     };
     
     componentWillUnmount() {
+        emitter.removeListener(this.setLoginStateListener);
         emitter.removeListener(this.setMapStyleListener);
         emitter.removeListener(this.displayDatasetListener);
         emitter.removeListener(this.removeDatasetListener);
@@ -479,7 +534,7 @@ class Canvas extends React.Component {
         return (
             <div>
             <div id="map" style={styles.root} ref={this.mapContainer}/>
-                            {!this.state.accessGranted && <RequestForm onSubmit={this.handleAccessGranted} />}
+                            {this.state.loggedIn && !this.state.accessGranted && <RequestForm onSubmit={this.handleAccessGranted} />}
 
                             </div>
         );

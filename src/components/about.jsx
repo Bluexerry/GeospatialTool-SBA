@@ -40,19 +40,15 @@ class About extends React.Component {
     }
 
     componentDidMount() {
-        // Initialize Modal
-        document.addEventListener('DOMContentLoaded', () => {
-            var elem = document.getElementById('about');
-            var modal = M.Modal.init(elem);
-            this.setState({
-                modal: modal
-            });
-        });
+        var elem = document.getElementById('about');
+        var modal = M.Modal.init(elem);
+        this.setState({ modal: modal });
     }
 
     componentWillUnmount() {
-        // Destory Modal
-        this.state.modal.destory();
+        if (this.state.modal) {
+            this.state.modal.destroy();
+        }
     }
 
     render() {

@@ -50,18 +50,22 @@ const styles = {
 class BushEncroacher extends React.Component {
     state = {
         open: false,
-        assets: [], // Aquí guardaremos los assets de GEE
-        selectedSpecies: '', // Aquí guardamos la especie seleccionada
-        selectedAsset: '', // Aquí guardamos el asset seleccionado por el usuario
-        speciesOptions: [], // Lista de especies para el primer selector
-        filteredAssets: [], // Lista de assets filtrados según la especie seleccionada
+        assets: [],
+        selectedSpecies: '',
+        selectedAsset: '',
+        speciesOptions: [],
+        filteredAssets: [],
     }
 
     componentDidMount() {
-        this.fetchAssets();  // Cargar los assets de GEE
+        this._assetsFetched = false;
 
         this.openBushEncroachControllerListener = emitter.addListener('openBushEncroachController', () => {
             this.setState({ open: true });
+            if (!this._assetsFetched) {
+                this._assetsFetched = true;
+                this.fetchAssets();
+            }
         });
 
         this.closeAllControllerListener = emitter.addListener('closeAllController', () => {
@@ -74,13 +78,10 @@ class BushEncroacher extends React.Component {
             const response = await fetch(`${EARTH_ENGINE_API_URL}/api/list-assets`);
             const data = await response.json();
             const assets = data.assets;
-
-            // Obtener las especies disponibles
             const speciesOptions = this.getSpeciesOptions(assets);
-            console.log(assets)
             this.setState({ assets: assets, speciesOptions: speciesOptions });
-        } catch (error) {
-            console.error('Error fetching assets:', error);
+        } catch {
+            // Backend offline — assets will remain empty until Docker is running
         }
     };
 
@@ -147,10 +148,8 @@ class BushEncroacher extends React.Component {
     };
 
     parseLayerName = (name) => {
-        console.log(name)
         if (name.endsWith('_avg')) {
             const parts = name.split('_');
-            console.log(parts)
             if (parts.length === 3) {
                 return 'Current'; // e.g., "Rhigozum_trichotomum_avg" -> "Current"
             } else if (parts.length === 5) {

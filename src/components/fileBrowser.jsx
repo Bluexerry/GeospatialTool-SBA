@@ -10,7 +10,7 @@ setChonkyDefaults({ iconComponent: ChonkyIconFA });
 
 const ROOT_FOLDER_ID = 1; // matches the seeded 'SBA' folder in init.sql
 
-export default function FileBrowser() {
+export default function FileBrowser({ shouldLoad }) {
   const [files, setFiles] = useState([]);
   const [folderChain, setFolderChain] = useState([{ id: ROOT_FOLDER_ID, name: 'SBA' }]);
   const [currentFolderId, setCurrentFolderId] = useState(ROOT_FOLDER_ID);
@@ -61,16 +61,21 @@ export default function FileBrowser() {
       const chain = await buildFolderChain(folderId);
       setFolderChain(chain);
       setCurrentFolderId(folderId);
-    } catch (error) {
-      console.error('Error loading folder', error);
+    } catch {
+      // folder load failed (backend offline or network error)
     } finally {
       stopLoading();
     }
   }, [buildFolderChain]);
 
+  const hasLoaded = useRef(false);
+
   useEffect(() => {
-    loadFolder(ROOT_FOLDER_ID);
-  }, [loadFolder]);
+    if (shouldLoad && !hasLoaded.current) {
+      hasLoaded.current = true;
+      loadFolder(ROOT_FOLDER_ID);
+    }
+  }, [loadFolder, shouldLoad]);
 
   const handleAction = useCallback(async (data) => {
     const startFileUpload = async (filesToUpload) => {

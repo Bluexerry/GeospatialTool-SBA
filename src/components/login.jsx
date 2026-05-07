@@ -155,8 +155,6 @@ class Login extends React.Component {
             datasets: datasets
         })
     
-        console.log("Updated datasets:", this.state.datasets);
-
         emitter.emit('moveDataset', this.state.datasets);
     }    
 
@@ -207,7 +205,6 @@ class Login extends React.Component {
     moveDataset = () => {
         var datos = this.state.datasets
         this.setState({ movedData: datos });
-        console.log(this.state.movedData)
 
     }
 

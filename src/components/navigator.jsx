@@ -89,8 +89,6 @@ class Navigator extends React.Component {
     }
 
     handleToken = (token) => {
-        console.log('Received token:', token);
-        // Aquí puedes hacer algo con los datos, como establecer el estado
         this.setState({ token: token });
     }
 

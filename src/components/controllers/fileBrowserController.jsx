@@ -45,8 +45,8 @@ const styles = {
     content: {
         flex: 1,
         padding: 0,
+        paddingBottom: 0,
         overflow: 'hidden',
-        '&:last-child': { paddingBottom: 0 },
     },
 };
 
@@ -81,7 +81,7 @@ class FileBrowserController extends React.Component {
                             </IconButton>
                         </CardContent>
                         <CardContent style={styles.content}>
-                            <FileBrowser />
+                            <FileBrowser shouldLoad={this.state.open} />
                         </CardContent>
                     </Card>
                 </Slide>
